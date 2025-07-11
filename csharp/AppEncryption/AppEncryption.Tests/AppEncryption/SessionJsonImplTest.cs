@@ -1,7 +1,7 @@
 using System;
+using System.Text.Json.Nodes;
 using GoDaddy.Asherah.AppEncryption.Envelope;
 using Moq;
-using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption
@@ -28,22 +28,22 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption
         [Fact]
         private void TestDecrypt()
         {
-            const string json = @"{key:'some_key', value:123}";
-            JObject expectedJson = JObject.Parse(json);
+            const string json = "{\"key\":\"some_key\", \"value\":123}";
+            JsonObject expectedJson = JsonObject.Parse(json).AsObject();
             byte[] utf8Bytes = new Asherah.AppEncryption.Util.Json(expectedJson).ToUtf8();
 
             envelopeEncryptionMock.Setup(x => x.DecryptDataRowRecord(It.IsAny<string>())).Returns(utf8Bytes);
 
-            JObject actualJson = sessionJsonImpl.Decrypt("some data row record");
-            Assert.Equal(expectedJson,  actualJson);
+            JsonObject actualJson = sessionJsonImpl.Decrypt("some data row record");
+            Assert.True(JsonNode.DeepEquals(expectedJson, actualJson));
         }
 
         [Fact]
         private void TestEncrypt()
         {
             const string expectedDataRowRecord = "some data row record";
-            const string json = @"{key:'some_key', value:123}";
-            JObject jObject = JObject.Parse(json);
+            const string json = "{\"key\":\"some_key\", \"value\":123}";
+            JsonObject jObject = JsonObject.Parse(json).AsObject();
 
             envelopeEncryptionMock.Setup(x => x.EncryptPayload(It.IsAny<byte[]>())).Returns(expectedDataRowRecord);
 

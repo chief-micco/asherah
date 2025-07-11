@@ -1,11 +1,11 @@
 using System;
 using System.Linq;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using GoDaddy.Asherah.AppEncryption.IntegrationTests.Utils;
 using GoDaddy.Asherah.Logging;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 using Xunit;
 using static GoDaddy.Asherah.AppEncryption.IntegrationTests.TestHelpers.Constants;
 
@@ -16,10 +16,10 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Multithreaded
     {
         private static readonly ILogger Logger = LogManager.CreateLogger<SessionJsonMultiThreadedTest>();
 
-        private readonly JObject payload;
+        private readonly JsonObject payload;
         private readonly SessionFactory sessionFactory;
         private readonly string partitionId;
-        private readonly Session<JObject, byte[]> sessionJson;
+        private readonly Session<JsonObject, byte[]> sessionJson;
 
         public SessionJsonMultiThreadedTest(ConfigFixture configFixture)
         {

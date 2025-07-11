@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using App.Metrics;
@@ -12,7 +13,6 @@ using GoDaddy.Asherah.Crypto;
 using GoDaddy.Asherah.Crypto.Keys;
 using Microsoft.Extensions.Caching.Memory;
 using Moq;
-using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption
@@ -26,8 +26,8 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption
         private const string TestRegionSuffix = "test_region_suffix";
         private const string TestStaticMasterKey = "thisIsAStaticMasterKeyForTesting";
 
-        private readonly Mock<IMetastore<JObject>> metastoreMock;
-        private readonly Mock<InMemoryMetastoreImpl<JObject>> metastoreSpy;
+        private readonly Mock<IMetastore<JsonObject>> metastoreMock;
+        private readonly Mock<InMemoryMetastoreImpl<JsonObject>> metastoreSpy;
         private readonly Mock<CryptoPolicy> cryptoPolicyMock;
         private readonly Mock<KeyManagementService> keyManagementServiceMock;
         private readonly Mock<SecureCryptoKeyDictionary<DateTimeOffset>> systemKeyCacheMock;
@@ -35,11 +35,11 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption
 
         public SessionFactoryTest()
         {
-            metastoreMock = new Mock<IMetastore<JObject>>();
+            metastoreMock = new Mock<IMetastore<JsonObject>>();
             cryptoPolicyMock = new Mock<CryptoPolicy>();
             keyManagementServiceMock = new Mock<KeyManagementService>();
             systemKeyCacheMock = new Mock<SecureCryptoKeyDictionary<DateTimeOffset>>(1);
-            metastoreSpy = new Mock<InMemoryMetastoreImpl<JObject>> { CallBase = true };
+            metastoreSpy = new Mock<InMemoryMetastoreImpl<JsonObject>> { CallBase = true };
 
             sessionFactory = new SessionFactory(
                 TestProductId,
@@ -730,7 +730,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption
         [Fact]
         private void TestGetSessionJson()
         {
-            Session<JObject, byte[]> sessionJson =
+            Session<JsonObject, byte[]> sessionJson =
                 sessionFactory.GetSessionJson(TestPartitionId);
             Assert.NotNull(sessionJson);
         }
@@ -746,7 +746,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption
         [Fact]
         private void TestGetSessionJsonAsJson()
         {
-            Session<JObject, JObject> session =
+            Session<JsonObject, JsonObject> session =
                 sessionFactory.GetSessionJsonAsJson(TestPartitionId);
             Assert.NotNull(session);
         }
@@ -754,7 +754,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption
         [Fact]
         private void TestGetSessionBytesAsJson()
         {
-            Session<byte[], JObject> session =
+            Session<byte[], JsonObject> session =
                 sessionFactory.GetSessionBytesAsJson(TestPartitionId);
             Assert.NotNull(session);
         }
@@ -838,7 +838,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption
                 SessionFactory.NewBuilder(TestProductId, TestServiceId);
             Assert.NotNull(metastoreStep);
 
-            IMetastore<JObject> metastore = new InMemoryMetastoreImpl<JObject>();
+            IMetastore<JsonObject> metastore = new InMemoryMetastoreImpl<JsonObject>();
             SessionFactory.ICryptoPolicyStep cryptoPolicyStep =
                 metastoreStep.WithMetastore(metastore);
             Assert.NotNull(cryptoPolicyStep);

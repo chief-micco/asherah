@@ -1,8 +1,8 @@
 using System;
+using System.Text.Json.Nodes;
 using GoDaddy.Asherah.AppEncryption.Envelope;
 using GoDaddy.Asherah.Crypto.ExtensionMethods;
 using LanguageExt;
-using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Envelope
@@ -98,12 +98,12 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Envelope
         {
             EnvelopeKeyRecord envelopeKeyRecord = new EnvelopeKeyRecord(created, parentKeyMeta, encryptedKey, Revoked);
 
-            JObject recordJson = envelopeKeyRecord.ToJson();
-            Assert.Equal(created.ToUnixTimeSeconds(), recordJson.GetValue("Created").ToObject<long>());
-            Assert.Equal(parentCreated.ToUnixTimeSeconds(), recordJson["ParentKeyMeta"]["Created"].ToObject<long>());
-            Assert.Equal(ParentKey, recordJson["ParentKeyMeta"]["KeyId"].ToObject<string>());
+            JsonObject recordJson = envelopeKeyRecord.ToJson();
+            Assert.Equal(created.ToUnixTimeSeconds(), recordJson["Created"].GetValue<long>());
+            Assert.Equal(parentCreated.ToUnixTimeSeconds(), recordJson["ParentKeyMeta"]["Created"].GetValue<long>());
+            Assert.Equal(ParentKey, recordJson["ParentKeyMeta"]["KeyId"].GetValue<string>());
             Assert.Equal(encryptedKey, Convert.FromBase64String(recordJson["Key"].ToString()));
-            Assert.Equal(Revoked, recordJson["Revoked"].ToObject<bool>());
+            Assert.Equal(Revoked, recordJson["Revoked"].GetValue<bool>());
         }
 
         [Fact]
@@ -111,8 +111,8 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Envelope
         {
             EnvelopeKeyRecord envelopeKeyRecord = new EnvelopeKeyRecord(created, null, encryptedKey);
 
-            JObject recordJson = envelopeKeyRecord.ToJson();
-            Assert.Equal(created.ToUnixTimeSeconds(), recordJson.GetValue("Created").ToObject<long>());
+            JsonObject recordJson = envelopeKeyRecord.ToJson();
+            Assert.Equal(created.ToUnixTimeSeconds(), recordJson["Created"].GetValue<long>());
             Assert.Null(recordJson["ParentKeyMeta"]);
             Assert.Equal(encryptedKey, Convert.FromBase64String(recordJson["Key"].ToString()));
             Assert.Null(recordJson["Revoked"]);

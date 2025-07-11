@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DocumentModel;
@@ -9,7 +11,6 @@ using GoDaddy.Asherah.AppEncryption.Persistence;
 using GoDaddy.Asherah.Crypto.Exceptions;
 using LanguageExt;
 using Moq;
-using Newtonsoft.Json.Linq;
 using Xunit;
 using static GoDaddy.Asherah.AppEncryption.Persistence.DynamoDbMetastoreImpl;
 
@@ -64,7 +65,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
                 .AddRangeKey(SortKey, DynamoDBEntryType.Numeric)
                 .Build();
 
-            JObject jObject = JObject.FromObject(keyRecord);
+            JsonObject jObject = JsonSerializer.SerializeToNode(keyRecord).AsObject();
             Document document = new Document
             {
                 [PartitionKey] = TestKey,
@@ -122,16 +123,16 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
         [Fact]
         private void TestLoadSuccess()
         {
-            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.Load(TestKey, created);
+            Option<JsonObject> actualJsonObject = dynamoDbMetastoreImpl.Load(TestKey, created);
 
             Assert.True(actualJsonObject.IsSome);
-            Assert.True(JToken.DeepEquals(JObject.FromObject(keyRecord), (JObject)actualJsonObject));
+            Assert.True(JsonNode.DeepEquals(JsonSerializer.SerializeToNode(keyRecord).AsObject(), (JsonObject)actualJsonObject));
         }
 
         [Fact]
         private void TestLoadWithNoResultShouldReturnEmpty()
         {
-            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.Load("fake_key", created);
+            Option<JsonObject> actualJsonObject = dynamoDbMetastoreImpl.Load("fake_key", created);
 
             Assert.False(actualJsonObject.IsSome);
         }
@@ -140,7 +141,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
         private void TestLoadWithFailureShouldReturnEmpty()
         {
             Dispose();
-            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.Load(TestKey, created);
+            Option<JsonObject> actualJsonObject = dynamoDbMetastoreImpl.Load(TestKey, created);
 
             Assert.False(actualJsonObject.IsSome);
         }
@@ -148,10 +149,10 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
         [Fact]
         private void TestLoadLatestWithSingleRecord()
         {
-            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.LoadLatest(TestKey);
+            Option<JsonObject> actualJsonObject = dynamoDbMetastoreImpl.LoadLatest(TestKey);
 
             Assert.True(actualJsonObject.IsSome);
-            Assert.True(JToken.DeepEquals(JObject.FromObject(keyRecord), (JObject)actualJsonObject));
+            Assert.True(JsonNode.DeepEquals(JsonSerializer.SerializeToNode(keyRecord).AsObject(), (JsonObject)actualJsonObject));
         }
 
         [Fact]
@@ -162,10 +163,10 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
                 .WithKeySuffix()
                 .Build();
 
-            Option<JObject> actualJsonObject = dbMetastoreImpl.LoadLatest(TestKey);
+            Option<JsonObject> actualJsonObject = dbMetastoreImpl.LoadLatest(TestKey);
 
             Assert.True(actualJsonObject.IsSome);
-            Assert.True(JToken.DeepEquals(JObject.FromObject(keyRecord), (JObject)actualJsonObject));
+            Assert.True(JsonNode.DeepEquals(JsonSerializer.SerializeToNode(keyRecord).AsObject(), (JsonObject)actualJsonObject));
         }
 
         [Fact]
@@ -181,7 +182,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             {
                 [PartitionKey] = TestKey,
                 [SortKey] = createdPlusOneHour.ToUnixTimeSeconds(),
-                [AttributeKeyRecord] = Document.FromJson(new JObject
+                [AttributeKeyRecord] = Document.FromJson(new JsonObject
                 {
                     { "mytime", createdPlusOneHour },
                 }.ToString()),
@@ -192,7 +193,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             {
                 [PartitionKey] = TestKey,
                 [SortKey] = createdPlusOneDay.ToUnixTimeSeconds(),
-                [AttributeKeyRecord] = Document.FromJson(new JObject
+                [AttributeKeyRecord] = Document.FromJson(new JsonObject
                 {
                     { "mytime", createdPlusOneDay },
                 }.ToString()),
@@ -203,7 +204,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             {
                 [PartitionKey] = TestKey,
                 [SortKey] = createdMinusOneHour.ToUnixTimeSeconds(),
-                [AttributeKeyRecord] = Document.FromJson(new JObject
+                [AttributeKeyRecord] = Document.FromJson(new JsonObject
                 {
                     { "mytime", createdMinusOneHour },
                 }.ToString()),
@@ -214,23 +215,23 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             {
                 [PartitionKey] = TestKey,
                 [SortKey] = createdMinusOneDay.ToUnixTimeSeconds(),
-                [AttributeKeyRecord] = Document.FromJson(new JObject
+                [AttributeKeyRecord] = Document.FromJson(new JsonObject
                 {
                     { "mytime", createdMinusOneDay },
                 }.ToString()),
             };
             await table.PutItemAsync(documentMinusOneDay);
 
-            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.LoadLatest(TestKey);
+            Option<JsonObject> actualJsonObject = dynamoDbMetastoreImpl.LoadLatest(TestKey);
 
             Assert.True(actualJsonObject.IsSome);
-            Assert.True(JToken.DeepEquals(createdPlusOneDay, ((JObject)actualJsonObject).GetValue("mytime")));
+            Assert.True(JsonNode.DeepEquals(createdPlusOneDay, ((JsonObject)actualJsonObject)["mytime"].GetValue<string>()));
         }
 
         [Fact]
         private void TestLoadLatestWithNoResultShouldReturnEmpty()
         {
-            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.LoadLatest("fake_key");
+            Option<JsonObject> actualJsonObject = dynamoDbMetastoreImpl.LoadLatest("fake_key");
 
             Assert.False(actualJsonObject.IsSome);
         }
@@ -239,7 +240,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
         private void TestLoadLatestWithFailureShouldReturnEmpty()
         {
             Dispose();
-            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.LoadLatest(TestKey);
+            Option<JsonObject> actualJsonObject = dynamoDbMetastoreImpl.LoadLatest(TestKey);
 
             Assert.False(actualJsonObject.IsSome);
         }
@@ -247,7 +248,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
         [Fact]
         private void TestStore()
         {
-            bool actualValue = dynamoDbMetastoreImpl.Store(TestKey, DateTimeOffset.Now, JObject.FromObject(keyRecord));
+            bool actualValue = dynamoDbMetastoreImpl.Store(TestKey, DateTimeOffset.Now, JsonSerializer.SerializeToNode(keyRecord).AsObject());
 
             Assert.True(actualValue);
         }
@@ -259,7 +260,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
                 .WithEndPointConfiguration(serviceUrl, Region)
                 .WithKeySuffix()
                 .Build();
-            bool actualValue = dbMetastoreImpl.Store(TestKey, DateTimeOffset.Now, JObject.FromObject(keyRecord));
+            bool actualValue = dbMetastoreImpl.Store(TestKey, DateTimeOffset.Now, JsonSerializer.SerializeToNode(keyRecord).AsObject());
 
             Assert.True(actualValue);
         }
@@ -269,15 +270,15 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
         {
             Dispose();
             Assert.Throws<AppEncryptionException>(() =>
-                dynamoDbMetastoreImpl.Store(TestKey, DateTimeOffset.Now, JObject.FromObject(keyRecord)));
+                dynamoDbMetastoreImpl.Store(TestKey, DateTimeOffset.Now, JsonSerializer.SerializeToNode(keyRecord).AsObject()));
         }
 
         [Fact]
         private void TestStoreWithDuplicateShouldReturnFalse()
         {
             DateTimeOffset now = DateTimeOffset.Now;
-            bool firstAttempt = dynamoDbMetastoreImpl.Store(TestKey, now, JObject.FromObject(keyRecord));
-            bool secondAttempt = dynamoDbMetastoreImpl.Store(TestKey, now, JObject.FromObject(keyRecord));
+            bool firstAttempt = dynamoDbMetastoreImpl.Store(TestKey, now, JsonSerializer.SerializeToNode(keyRecord).AsObject());
+            bool secondAttempt = dynamoDbMetastoreImpl.Store(TestKey, now, JsonSerializer.SerializeToNode(keyRecord).AsObject());
 
             Assert.True(firstAttempt);
             Assert.False(secondAttempt);
@@ -375,7 +376,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
                 .AddHashKey(PartitionKey, DynamoDBEntryType.String)
                 .AddRangeKey(SortKey, DynamoDBEntryType.Numeric)
                 .Build();
-            JObject jObject = JObject.FromObject(keyRecord);
+            JsonObject jObject = JsonSerializer.SerializeToNode(keyRecord).AsObject();
             Document document = new Document
             {
                 [PartitionKey] = TestKey,
@@ -389,11 +390,11 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
                 .WithEndPointConfiguration(serviceUrl, "us-west-2")
                 .WithTableName(tempTableName)
                 .Build();
-            Option<JObject> actualJsonObject = dbMetastoreImpl.Load(TestKey, created);
+            Option<JsonObject> actualJsonObject = dbMetastoreImpl.Load(TestKey, created);
 
             // Verify that we were able to load and successfully decrypt the item from the metastore object created withTableName
             Assert.True(actualJsonObject.IsSome);
-            Assert.True(JToken.DeepEquals(JObject.FromObject(keyRecord), (JObject)actualJsonObject));
+            Assert.True(JsonNode.DeepEquals(JsonSerializer.SerializeToNode(keyRecord).AsObject(), (JsonObject)actualJsonObject));
         }
 
         [Fact]

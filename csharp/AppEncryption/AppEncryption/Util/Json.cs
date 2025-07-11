@@ -1,11 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using LanguageExt;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 [assembly: InternalsVisibleTo("AppEncryption.Tests")]
 
@@ -17,14 +16,14 @@ namespace GoDaddy.Asherah.AppEncryption.Util
     /// </summary>
     public class Json
     {
-        private readonly JObject document;
+        private readonly JsonObject document;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Json"/> class.
         /// </summary>
         public Json()
         {
-            document = new JObject();
+            document = new JsonObject();
         }
 
         /// <summary>
@@ -32,7 +31,7 @@ namespace GoDaddy.Asherah.AppEncryption.Util
         /// </summary>
         ///
         /// <param name="jObject">The <see cref="JObject"/> object to convert to <see cref="Json"/>.</param>
-        public Json(JObject jObject)
+        public Json(JsonObject jObject)
         {
             document = jObject ?? throw new ArgumentException("jObject is null");
         }
@@ -55,7 +54,8 @@ namespace GoDaddy.Asherah.AppEncryption.Util
         /// <returns>The value associated with the key.</returns>
         public Json GetJson(string key)
         {
-            return new Json(document.GetValue(key).ToObject<JObject>());
+            // return new Json(document.GetValue(key).ToObject<JObject>());
+            return new Json(document[key].AsObject());
         }
 
         /// <summary>
@@ -67,7 +67,15 @@ namespace GoDaddy.Asherah.AppEncryption.Util
         /// exist.</returns>
         public Option<Json> GetOptionalJson(string key)
         {
-            return document.TryGetValue(key, out JToken result) ? new Json(result.ToObject<JObject>()) : Option<Json>.None;
+            var node = document[key];
+            if (node == null)
+            {
+                return Option<Json>.None;
+            }
+
+            var rawText = node.ToJsonString(Serialization.NoFormatting);
+            var jsonObject = JsonSerializer.Deserialize<JsonObject>(rawText);
+            return new Json(jsonObject);
         }
 
         /// <summary>
@@ -78,7 +86,7 @@ namespace GoDaddy.Asherah.AppEncryption.Util
         /// <returns>The value associated with the key, as a string.</returns>
         public string GetString(string key)
         {
-            return document.GetValue(key).ToObject<string>();
+            return document[key].GetValue<string>();
         }
 
         /// <summary>
@@ -89,7 +97,7 @@ namespace GoDaddy.Asherah.AppEncryption.Util
         /// <returns>The value associated with the key, as a byte array.</returns>
         public byte[] GetBytes(string key)
         {
-            return Convert.FromBase64String(document.GetValue(key).ToObject<string>());
+            return Convert.FromBase64String(document[key].GetValue<string>());
         }
 
         /// <summary>
@@ -101,7 +109,7 @@ namespace GoDaddy.Asherah.AppEncryption.Util
         /// <returns>The time associated with the key.</returns>
         public DateTimeOffset GetDateTimeOffset(string key)
         {
-            long unixTime = document.GetValue(key).ToObject<long>();
+            var unixTime = document[key].GetValue<long>();
             return DateTimeOffset.FromUnixTimeSeconds(unixTime);
         }
 
@@ -114,7 +122,14 @@ namespace GoDaddy.Asherah.AppEncryption.Util
         /// exist.</returns>
         public Option<bool> GetOptionalBoolean(string key)
         {
-            return document.TryGetValue(key, out JToken result) ? result.ToObject<Option<bool>>() : Option<bool>.None;
+            var node = document[key];
+            if (node == null)
+            {
+                return Option<bool>.None;
+            }
+
+            var rawText = node.ToJsonString(Serialization.NoFormatting);
+            return JsonSerializer.Deserialize<bool>(rawText);
         }
 
         /// <summary>
@@ -123,9 +138,9 @@ namespace GoDaddy.Asherah.AppEncryption.Util
         ///
         /// <param name="key">The key whose value needs to be retrieved.</param>
         /// <returns>The value associated with the key.</returns>
-        public JArray GetJsonArray(string key)
+        public JsonArray GetJsonArray(string key)
         {
-            return document.GetValue(key).ToObject<JArray>();
+            return document[key].AsArray();
         }
 
         /// <summary>
@@ -167,7 +182,7 @@ namespace GoDaddy.Asherah.AppEncryption.Util
         ///
         /// <param name="key">The key to add to the <see cref="Json"/> object.</param>
         /// <param name="jObject">The value associated with the key.</param>
-        public void Put(string key, JObject jObject)
+        public void Put(string key, JsonObject jObject)
         {
             document.Add(key, jObject);
         }
@@ -201,9 +216,10 @@ namespace GoDaddy.Asherah.AppEncryption.Util
         ///
         /// <param name="key">The key to add to the <see cref="Json"/> object.</param>
         /// <param name="jsonList">The value associated with the key.</param>
-        public void Put(string key, List<JObject> jsonList)
+        public void Put(string key, List<JsonObject> jsonList)
         {
-            document.Add(key, JToken.FromObject(jsonList));
+            var nodeToAdd = JsonSerializer.SerializeToNode(jsonList);
+            document.Add(key, nodeToAdd);
         }
 
         /// <summary>
@@ -213,7 +229,7 @@ namespace GoDaddy.Asherah.AppEncryption.Util
         /// <returns>The json document as a string.</returns>
         public string ToJsonString()
         {
-            return document.ToString(Formatting.None);
+            return document.ToJsonString(Serialization.NoFormatting);
         }
 
         /// <summary>
@@ -227,28 +243,25 @@ namespace GoDaddy.Asherah.AppEncryption.Util
         }
 
         /// <summary>
-        /// Converts the <see cref="Json"/> object to a <see cref="JObject"/> object.
+        /// Converts the <see cref="Json"/> object to a <see cref="JsonObject"/> object.
         /// </summary>
         ///
-        /// <returns>The json document as a <see cref="JObject"/> object.</returns>
-        public JObject ToJObject()
+        /// <returns>The json document as a <see cref="JsonObject"/> object.</returns>
+        public JsonObject ToJObject()
         {
             return document;
         }
 
-        private static byte[] ConvertJsonToUtf8(JObject jObject)
+        private static byte[] ConvertJsonToUtf8(JsonObject jObject)
         {
             // JObject.ToString(Formatting.None) appears to be more efficient than JsonConvert.SerializeObject
-            string serializeObject = jObject.ToString(Formatting.None);
+            var serializeObject = jObject.ToJsonString(Serialization.NoFormatting);
             return Encoding.UTF8.GetBytes(serializeObject);
         }
 
-        private static JObject ConvertUtf8ToJson(byte[] utf8)
+        private static JsonObject ConvertUtf8ToJson(byte[] utf8)
         {
-            JsonReader jsonReader = new JsonTextReader(new StreamReader(new MemoryStream(utf8), Encoding.UTF8));
-            jsonReader.DateParseHandling = DateParseHandling.None;
-
-            return JObject.Load(jsonReader);
+            return JsonNode.Parse(utf8, null, Serialization.BytesParsingOptions).AsObject();
         }
     }
 }

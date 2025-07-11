@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text.Json.Nodes;
 using App.Metrics;
 using GoDaddy.Asherah.AppEncryption.Envelope;
 using GoDaddy.Asherah.AppEncryption.IntegrationTests.TestHelpers;
@@ -12,7 +13,6 @@ using GoDaddy.Asherah.Crypto;
 using GoDaddy.Asherah.Crypto.Engine.BouncyCastle;
 using GoDaddy.Asherah.Crypto.Keys;
 using Moq;
-using Newtonsoft.Json.Linq;
 using Xunit;
 using static GoDaddy.Asherah.AppEncryption.IntegrationTests.TestHelpers.Constants;
 
@@ -20,7 +20,7 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
 {
     public class AppEncryptionParameterizedTest
     {
-        private readonly JObject payload;
+        private readonly JsonObject payload;
 
         public AppEncryptionParameterizedTest()
         {
@@ -31,14 +31,14 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
         [ClassData(typeof(AppEncryptionParameterizedTestData))]
         public void ParameterizedTests(
             IEnvelopeEncryption<byte[]> envelopeEncryptionJson,
-            Mock<IMetastore<JObject>> metastore,
+            Mock<IMetastore<JsonObject>> metastore,
             KeyState cacheIK,
             KeyState metaIK,
             KeyState cacheSK,
             KeyState metaSK,
             Partition partition)
         {
-            using (Session<JObject, byte[]> sessionJsonImpl =
+            using (Session<JsonObject, byte[]> sessionJsonImpl =
                 new SessionJsonImpl<byte[]>(envelopeEncryptionJson))
             {
                 EncryptMetastoreInteractions encryptMetastoreInteractions =
@@ -53,15 +53,15 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
                 VerifyEncryptFlow(metastore, encryptMetastoreInteractions, partition);
 
                 metastore.Invocations.Clear();
-                JObject decryptedPayload = sessionJsonImpl.Decrypt(encryptedPayload);
+                JsonObject decryptedPayload = sessionJsonImpl.Decrypt(encryptedPayload);
 
                 VerifyDecryptFlow(metastore, decryptMetastoreInteractions, partition);
-                Assert.True(JToken.DeepEquals(payload, decryptedPayload));
+                Assert.True(JsonNode.DeepEquals(payload, decryptedPayload));
             }
         }
 
         private void VerifyDecryptFlow(
-            Mock<IMetastore<JObject>> metastore,
+            Mock<IMetastore<JsonObject>> metastore,
             DecryptMetastoreInteractions metastoreInteractions,
             Partition partition)
         {
@@ -82,7 +82,7 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
         }
 
         private void VerifyEncryptFlow(
-            Mock<IMetastore<JObject>> metastore,
+            Mock<IMetastore<JsonObject>> metastore,
             EncryptMetastoreInteractions metastoreInteractions,
             Partition partition)
         {
@@ -90,13 +90,13 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
             if (metastoreInteractions.ShouldStoreIK())
             {
                 metastore.Verify(
-                    x => x.Store(partition.IntermediateKeyId, It.IsAny<DateTimeOffset>(), It.IsAny<JObject>()),
+                    x => x.Store(partition.IntermediateKeyId, It.IsAny<DateTimeOffset>(), It.IsAny<JsonObject>()),
                     Times.Once);
             }
             else
             {
                 metastore.Verify(
-                    x => x.Store(partition.IntermediateKeyId, It.IsAny<DateTimeOffset>(), It.IsAny<JObject>()),
+                    x => x.Store(partition.IntermediateKeyId, It.IsAny<DateTimeOffset>(), It.IsAny<JsonObject>()),
                     Times.Never);
             }
 
@@ -104,13 +104,13 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
             if (metastoreInteractions.ShouldStoreSK())
             {
                 metastore.Verify(
-                    x => x.Store(partition.SystemKeyId, It.IsAny<DateTimeOffset>(), It.IsAny<JObject>()),
+                    x => x.Store(partition.SystemKeyId, It.IsAny<DateTimeOffset>(), It.IsAny<JsonObject>()),
                     Times.Once);
             }
             else
             {
                 metastore.Verify(
-                    x => x.Store(partition.SystemKeyId, It.IsAny<DateTimeOffset>(), It.IsAny<JObject>()),
+                    x => x.Store(partition.SystemKeyId, It.IsAny<DateTimeOffset>(), It.IsAny<JsonObject>()),
                     Times.Never);
             }
 
@@ -118,7 +118,7 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
             if (!metastoreInteractions.ShouldStoreIK() && !metastoreInteractions.ShouldStoreSK())
             {
                 metastore.Verify(
-                    x => x.Store(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<JObject>()),
+                    x => x.Store(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<JsonObject>()),
                     Times.Never);
             }
 
@@ -215,7 +215,7 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
 
                 CryptoKeyHolder cryptoKeyHolder = CryptoKeyHolder.GenerateIKSK();
 
-                Mock<IMetastore<JObject>> metastoreMock = MetastoreMock.CreateMetastoreMock(
+                Mock<IMetastore<JsonObject>> metastoreMock = MetastoreMock.CreateMetastoreMock(
                     partition, kms, metaIK, metaSK, cryptoKeyHolder, configFixture.Metastore);
 
                 CacheMock cacheMock = CacheMock.CreateCacheMock(cacheIK, cacheSK, cryptoKeyHolder);

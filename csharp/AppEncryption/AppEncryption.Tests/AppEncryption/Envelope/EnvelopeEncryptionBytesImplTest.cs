@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using GoDaddy.Asherah.AppEncryption.Envelope;
 using Moq;
-using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Envelope
@@ -25,11 +26,12 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Envelope
         {
             byte[] expectedBytes = { 0, 1 };
 
-            envelopeEncryptionJsonImplMock.Setup(x => x.DecryptDataRowRecord(It.IsAny<JObject>()))
+            envelopeEncryptionJsonImplMock.Setup(x => x.DecryptDataRowRecord(It.IsAny<JsonObject>()))
                 .Returns(expectedBytes);
 
             ImmutableDictionary<string, string> immutableDictionary = new Dictionary<string, string> { { "key", "value" } }.ToImmutableDictionary();
-            byte[] dataRowRecordBytes = new Asherah.AppEncryption.Util.Json(JObject.FromObject(immutableDictionary)).ToUtf8();
+            var jsonObject = JsonSerializer.SerializeToNode(immutableDictionary).AsObject();
+            byte[] dataRowRecordBytes = new Asherah.AppEncryption.Util.Json(jsonObject).ToUtf8();
             byte[] actualBytes = envelopeEncryptionBytesImpl.DecryptDataRowRecord(dataRowRecordBytes);
             Assert.Equal(expectedBytes, actualBytes);
         }
@@ -38,7 +40,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Envelope
         private void TestEncryptPayload()
         {
             ImmutableDictionary<string, string> immutableDictionary = new Dictionary<string, string> { { "key", "value" } }.ToImmutableDictionary();
-            JObject dataRowRecord = JObject.FromObject(immutableDictionary);
+            JsonObject dataRowRecord = JsonSerializer.SerializeToNode(immutableDictionary).AsObject();
             byte[] expectedBytes = { 123, 34, 107, 101, 121, 34, 58, 34, 118, 97, 108, 117, 101, 34, 125 };
 
             envelopeEncryptionJsonImplMock.Setup(x => x.EncryptPayload(It.IsAny<byte[]>())).Returns(dataRowRecord);

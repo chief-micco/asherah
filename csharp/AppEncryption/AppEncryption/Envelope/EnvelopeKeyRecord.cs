@@ -1,8 +1,8 @@
 using System;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Nodes;
 using GoDaddy.Asherah.AppEncryption.Util;
 using LanguageExt;
-using Newtonsoft.Json.Linq;
 
 [assembly: InternalsVisibleTo("AppEncryption.IntegrationTests")]
 
@@ -94,7 +94,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         /// </summary>
         ///
         /// <returns>The <see cref="EnvelopeKeyRecord"/> converted to a <see cref="JObject"/>.</returns>
-        public JObject ToJson()
+        public JsonObject ToJson()
         {
             Json json = new Json();
             json.Put("Created", Created);

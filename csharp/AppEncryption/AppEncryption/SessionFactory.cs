@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Text.Json.Nodes;
 using App.Metrics;
 using App.Metrics.Concurrency;
 using GoDaddy.Asherah.AppEncryption.Envelope;
@@ -13,7 +14,6 @@ using GoDaddy.Asherah.Crypto.Keys;
 using GoDaddy.Asherah.Logging;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 
 namespace GoDaddy.Asherah.AppEncryption
 {
@@ -33,7 +33,7 @@ namespace GoDaddy.Asherah.AppEncryption
 
         private readonly string productId;
         private readonly string serviceId;
-        private readonly IMetastore<JObject> metastore;
+        private readonly IMetastore<JsonObject> metastore;
         private readonly SecureCryptoKeyDictionary<DateTimeOffset> systemKeyCache;
         private readonly CryptoPolicy cryptoPolicy;
         private readonly KeyManagementService keyManagementService;
@@ -57,7 +57,7 @@ namespace GoDaddy.Asherah.AppEncryption
         public SessionFactory(
             string productId,
             string serviceId,
-            IMetastore<JObject> metastore,
+            IMetastore<JsonObject> metastore,
             SecureCryptoKeyDictionary<DateTimeOffset> systemKeyCache,
             CryptoPolicy cryptoPolicy,
             KeyManagementService keyManagementService)
@@ -92,7 +92,7 @@ namespace GoDaddy.Asherah.AppEncryption
             ///
             /// <returns>The current <see cref="ICryptoPolicyStep"/> instance initialized with some
             /// <see cref="IMetastore{T}"/> implementation.</returns>
-            ICryptoPolicyStep WithMetastore(IMetastore<JObject> metastore);
+            ICryptoPolicyStep WithMetastore(IMetastore<JsonObject> metastore);
         }
 
         public interface ICryptoPolicyStep
@@ -216,7 +216,7 @@ namespace GoDaddy.Asherah.AppEncryption
         /// <param name="partitionId">A unique identifier for a session.</param>
         ///
         /// <returns>A <see cref="Session{TP,TD}"/> that encrypts a json payload and stores it as a byte[].</returns>
-        public Session<JObject, byte[]> GetSessionJson(string partitionId)
+        public Session<JsonObject, byte[]> GetSessionJson(string partitionId)
         {
             IEnvelopeEncryption<byte[]> envelopeEncryption = GetEnvelopeEncryptionBytes(partitionId);
 
@@ -244,11 +244,11 @@ namespace GoDaddy.Asherah.AppEncryption
         /// <param name="partitionId">A unique identifier for a session.</param>
         ///
         /// <returns>A <see cref="Session{TP,TD}"/> that encrypts a json payload and stores it as a json.</returns>
-        public Session<JObject, JObject> GetSessionJsonAsJson(string partitionId)
+        public Session<JsonObject, JsonObject> GetSessionJsonAsJson(string partitionId)
         {
-            IEnvelopeEncryption<JObject> envelopeEncryption = GetEnvelopeEncryptionJson(partitionId);
+            IEnvelopeEncryption<JsonObject> envelopeEncryption = GetEnvelopeEncryptionJson(partitionId);
 
-            return new SessionJsonImpl<JObject>(envelopeEncryption);
+            return new SessionJsonImpl<JsonObject>(envelopeEncryption);
         }
 
         /// <summary>
@@ -258,11 +258,11 @@ namespace GoDaddy.Asherah.AppEncryption
         /// <param name="partitionId">A unique identifier for a session.</param>
         ///
         /// <returns>A <see cref="Session{TP,TD}"/> that encrypts a byte[] payload and stores it as a json.</returns>
-        public Session<byte[], JObject> GetSessionBytesAsJson(string partitionId)
+        public Session<byte[], JsonObject> GetSessionBytesAsJson(string partitionId)
         {
-            IEnvelopeEncryption<JObject> envelopeEncryption = GetEnvelopeEncryptionJson(partitionId);
+            IEnvelopeEncryption<JsonObject> envelopeEncryption = GetEnvelopeEncryptionJson(partitionId);
 
-            return new SessionBytesImpl<JObject>(envelopeEncryption);
+            return new SessionBytesImpl<JsonObject>(envelopeEncryption);
         }
 
         internal IEnvelopeEncryption<byte[]> GetEnvelopeEncryptionBytes(string partitionId)
@@ -363,7 +363,7 @@ namespace GoDaddy.Asherah.AppEncryption
             }
         }
 
-        private IEnvelopeEncryption<JObject> GetEnvelopeEncryptionJson(string partitionId)
+        private IEnvelopeEncryption<JsonObject> GetEnvelopeEncryptionJson(string partitionId)
         {
             // Wrap the creation logic in a lambda so the cache entry acquisition can create a new instance when needed
             Func<EnvelopeEncryptionJsonImpl> createSessionFunc = () =>
@@ -389,7 +389,7 @@ namespace GoDaddy.Asherah.AppEncryption
         }
 
         // Calling it CachedSession but we actually cache the implementing envelope encryption class.
-        private class CachedSession : IEnvelopeEncryption<JObject>
+        private class CachedSession : IEnvelopeEncryption<JsonObject>
         {
             private readonly EnvelopeEncryptionJsonImpl envelopeEncryptionJsonImpl;
 
@@ -414,12 +414,12 @@ namespace GoDaddy.Asherah.AppEncryption
                 sessionFactory.ReleaseShared(key);
             }
 
-            public byte[] DecryptDataRowRecord(JObject dataRowRecord)
+            public byte[] DecryptDataRowRecord(JsonObject dataRowRecord)
             {
                 return envelopeEncryptionJsonImpl.DecryptDataRowRecord(dataRowRecord);
             }
 
-            public JObject EncryptPayload(byte[] payload)
+            public JsonObject EncryptPayload(byte[] payload)
             {
                 return envelopeEncryptionJsonImpl.EncryptPayload(payload);
             }
@@ -450,7 +450,7 @@ namespace GoDaddy.Asherah.AppEncryption
             private readonly string productId;
             private readonly string serviceId;
 
-            private IMetastore<JObject> metastore;
+            private IMetastore<JsonObject> metastore;
             private CryptoPolicy cryptoPolicy;
             private KeyManagementService keyManagementService;
             private IMetrics metrics;
@@ -463,11 +463,11 @@ namespace GoDaddy.Asherah.AppEncryption
 
             public ICryptoPolicyStep WithInMemoryMetastore()
             {
-                metastore = new InMemoryMetastoreImpl<JObject>();
+                metastore = new InMemoryMetastoreImpl<JsonObject>();
                 return this;
             }
 
-            public ICryptoPolicyStep WithMetastore(IMetastore<JObject> metastore)
+            public ICryptoPolicyStep WithMetastore(IMetastore<JsonObject> metastore)
             {
                 this.metastore = metastore;
                 return this;

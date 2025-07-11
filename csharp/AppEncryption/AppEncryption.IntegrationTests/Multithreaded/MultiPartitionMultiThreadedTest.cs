@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using GoDaddy.Asherah.AppEncryption.IntegrationTests.Utils;
@@ -8,7 +9,6 @@ using GoDaddy.Asherah.AppEncryption.Persistence;
 using GoDaddy.Asherah.Logging;
 using LanguageExt;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 using Xunit;
 using Xunit.Sdk;
 
@@ -71,7 +71,7 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Multithreaded
         {
             try
             {
-                using (Session<JObject, byte[]> session =
+                using (Session<JsonObject, byte[]> session =
                     sessionFactory.GetSessionJson(partitionId))
                 {
                     Dictionary<string, byte[]> dataStore = new Dictionary<string, byte[]>();
@@ -81,7 +81,7 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Multithreaded
                     for (int i = 0; i < testIterations; i++)
                     {
                         // Note the size will be slightly larger since we're adding extra unique meta
-                        JObject jsonObject = PayloadGenerator.CreateRandomJsonPayload(payloadSizeBytesBase);
+                        JsonObject jsonObject = PayloadGenerator.CreateRandomJsonPayload(payloadSizeBytesBase);
                         string keyPart = $"iteration-{i}";
                         jsonObject.Add("payload", partitionPart + keyPart);
 
@@ -90,8 +90,8 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Multithreaded
 
                     foreach (KeyValuePair<string, byte[]> keyValuePair in dataStore)
                     {
-                        JObject decryptedObject = session.Decrypt(keyValuePair.Value);
-                        Assert.Equal(partitionPart + keyValuePair.Key, decryptedObject.GetValue("payload").ToObject<string>());
+                        JsonObject decryptedObject = session.Decrypt(keyValuePair.Value);
+                        Assert.Equal(partitionPart + keyValuePair.Key, decryptedObject["payload"].GetValue<string>());
                     }
                 }
             }
@@ -137,7 +137,7 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Multithreaded
         {
             try
             {
-                using (Session<JObject, byte[]> session =
+                using (Session<JsonObject, byte[]> session =
                     sessionFactory.GetSessionJson(partitionId))
                 {
                     string partitionPart = "partition-" + partitionId + "-";
@@ -145,16 +145,16 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Multithreaded
                     for (int i = 0; i < testIterations; i++)
                     {
                         // Note the size will be slightly larger since we're adding extra unique meta
-                        JObject jsonObject = PayloadGenerator.CreateRandomJsonPayload(payloadSizeBytesBase);
+                        JsonObject jsonObject = PayloadGenerator.CreateRandomJsonPayload(payloadSizeBytesBase);
                         string keyPart = $"iteration-{i}";
                         jsonObject.Add("payload", partitionPart + keyPart);
 
                         string persistenceKey = session.Store(jsonObject, PersistenceBytes);
-                        Option<JObject> decryptedJsonPayload = session.Load(persistenceKey, PersistenceBytes);
+                        Option<JsonObject> decryptedJsonPayload = session.Load(persistenceKey, PersistenceBytes);
                         if (decryptedJsonPayload.IsSome)
                         {
-                            JObject decryptedJson = (JObject)decryptedJsonPayload;
-                            Assert.Equal(partitionPart + keyPart, decryptedJson.GetValue("payload").ToObject<string>());
+                            JsonObject decryptedJson = (JsonObject)decryptedJsonPayload;
+                            Assert.Equal(partitionPart + keyPart, decryptedJson["payload"].GetValue<string>());
                         }
                         else
                         {

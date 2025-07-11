@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Nodes;
 using App.Metrics.Timer;
 using GoDaddy.Asherah.AppEncryption.Exceptions;
 using GoDaddy.Asherah.AppEncryption.Kms;
@@ -13,7 +14,6 @@ using GoDaddy.Asherah.Crypto.Keys;
 using GoDaddy.Asherah.Logging;
 using LanguageExt;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 
 [assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]
 [assembly: InternalsVisibleTo("AppEncryption.Tests")]
@@ -21,7 +21,7 @@ using Newtonsoft.Json.Linq;
 namespace GoDaddy.Asherah.AppEncryption.Envelope
 {
     /// <inheritdoc />
-    public class EnvelopeEncryptionJsonImpl : IEnvelopeEncryption<JObject>
+    public class EnvelopeEncryptionJsonImpl : IEnvelopeEncryption<JsonObject>
     {
         private static readonly ILogger Logger = LogManager.CreateLogger<EnvelopeEncryptionJsonImpl>();
 
@@ -29,7 +29,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         private static readonly TimerOptions DecryptTimerOptions = new TimerOptions { Name = MetricsUtil.AelMetricsPrefix + ".drr.decrypt" };
 
         private readonly Partition partition;
-        private readonly IMetastore<JObject> metastore;
+        private readonly IMetastore<JsonObject> metastore;
         private readonly SecureCryptoKeyDictionary<DateTimeOffset> systemKeyCache; // assuming limited to 1 product/service id pair
         private readonly SecureCryptoKeyDictionary<DateTimeOffset> intermediateKeyCache;
         private readonly AeadEnvelopeCrypto crypto;
@@ -59,7 +59,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         /// </param>
         public EnvelopeEncryptionJsonImpl(
             Partition partition,
-            IMetastore<JObject> metastore,
+            IMetastore<JsonObject> metastore,
             SecureCryptoKeyDictionary<DateTimeOffset> systemKeyCache,
             SecureCryptoKeyDictionary<DateTimeOffset> intermediateKeyCache,
             AeadEnvelopeCrypto aeadEnvelopeCrypto,
@@ -81,7 +81,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         }
 
         /// <inheritdoc/>
-        public virtual byte[] DecryptDataRowRecord(JObject dataRowRecord)
+        public virtual byte[] DecryptDataRowRecord(JsonObject dataRowRecord)
         {
             using (MetricsUtil.MetricsInstance.Measure.Timer.Time(DecryptTimerOptions))
             {
@@ -111,7 +111,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         }
 
         /// <inheritdoc/>
-        public virtual JObject EncryptPayload(byte[] payload)
+        public virtual JsonObject EncryptPayload(byte[] payload)
         {
             using (MetricsUtil.MetricsInstance.Measure.Timer.Time(EncryptTimerOptions))
             {

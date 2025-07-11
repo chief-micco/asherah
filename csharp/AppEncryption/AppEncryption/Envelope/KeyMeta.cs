@@ -1,6 +1,6 @@
 using System;
+using System.Text.Json.Nodes;
 using GoDaddy.Asherah.AppEncryption.Util;
-using Newtonsoft.Json.Linq;
 
 namespace GoDaddy.Asherah.AppEncryption.Envelope
 {
@@ -56,7 +56,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         /// </summary>
         ///
         /// <returns>The <see cref="KeyMeta"/> converted to a <see cref="JObject"/> object.</returns>
-        public JObject ToJson()
+        public JsonObject ToJson()
         {
             Json json = new Json();
             json.Put("KeyId", KeyId);

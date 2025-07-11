@@ -67,6 +67,7 @@ exclude-path-patterns = [
     {path-pattern = '.*/package.json', reason = 'Exclude node dependency files'},
     {path-pattern = '.*/package.lock.json', reason = 'Exclude node dependency files'},
     {path-pattern = 'tartufo.toml', reason = 'Exclude tartufo config file'},
+    {path-pattern = '.*\.DotSettings', readon = 'Exclued DotSettings files'},
 ]
 
 exclude-entropy-patterns = [

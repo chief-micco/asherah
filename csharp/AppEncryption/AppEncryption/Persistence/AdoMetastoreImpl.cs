@@ -1,13 +1,13 @@
 using System;
 using System.Data.Common;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using App.Metrics.Timer;
 using GoDaddy.Asherah.AppEncryption.Util;
 using GoDaddy.Asherah.Logging;
 using LanguageExt;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 [assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]
 [assembly: InternalsVisibleTo("AppEncryption.Tests")]
@@ -20,7 +20,7 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
     /// a hierarchical key structure. It uses the table name "encryption_key" to perform all RDBMS based operations.
     /// Stores the created time in UTC.
     /// </summary>
-    public class AdoMetastoreImpl : IMetastore<JObject>
+    public class AdoMetastoreImpl : IMetastore<JsonObject>
     {
         internal const string Created = "created";
         internal const string Id = "id";
@@ -69,9 +69,9 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
         ///
         /// <param name="keyId">The keyId to lookup.</param>
         /// <param name="created">The created time to lookup which is converted to UTC.</param>
-        /// <returns>The <seealso cref="JObject"/> value associated with the <paramref name="keyId"/> and
+        /// <returns>The <seealso cref="JsonObject"/> value associated with the <paramref name="keyId"/> and
         /// <paramref name="created"/> tuple.</returns>
-        public virtual Option<JObject> Load(string keyId, DateTimeOffset created)
+        public virtual Option<JsonObject> Load(string keyId, DateTimeOffset created)
         {
             using (MetricsUtil.MetricsInstance.Measure.Timer.Time(LoadTimerOptions))
             {
@@ -94,7 +94,7 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
                     Logger.LogError(dbe, "Metastore error");
                 }
 
-                return Option<JObject>.None;
+                return Option<JsonObject>.None;
             }
         }
 
@@ -104,7 +104,7 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
         ///
         /// <param name="keyId">the keyId to lookup.</param>
         /// <returns>The latest value associated with the keyId, if any.</returns>
-        public Option<JObject> LoadLatest(string keyId)
+        public Option<JsonObject> LoadLatest(string keyId)
         {
             using (MetricsUtil.MetricsInstance.Measure.Timer.Time(LoadLatestTimerOptions))
             {
@@ -126,7 +126,7 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
                     Logger.LogError(dbe, "Metastore error");
                 }
 
-                return Option<JObject>.None;
+                return Option<JsonObject>.None;
             }
         }
 
@@ -136,10 +136,10 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
         ///
         /// <param name="keyId">The keyId to store.</param>
         /// <param name="created">The created time to store.</param>
-        /// <param name="value">The <seealso cref="JObject"/> value to store.</param>
+        /// <param name="value">The <seealso cref="JsonObject"/> value to store.</param>
         /// <returns><value>True</value> if the store succeeded, false if the store failed for a known condition
         /// e.g., trying to save a duplicate value should return false, not throw an exception. </returns>
-        public bool Store(string keyId, DateTimeOffset created, JObject value)
+        public bool Store(string keyId, DateTimeOffset created, JsonObject value)
         {
             using (MetricsUtil.MetricsInstance.Measure.Timer.Time(StoreTimerOptions))
             {
@@ -152,7 +152,7 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
                             command.CommandText = StoreQuery;
                             AddParameter(command, Id, keyId);
                             AddParameter(command, Created, created.UtcDateTime);
-                            AddParameter(command, KeyRecord, value.ToString(Formatting.None));
+                            AddParameter(command, KeyRecord, value.ToJsonString(Serialization.NoFormatting));
 
                             int result = command.ExecuteNonQuery();
 
@@ -184,7 +184,7 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
             command.Parameters.Add(parameter);
         }
 
-        internal virtual Option<JObject> ExecuteQueryAndLoadJsonObjectFromKey(DbCommand command)
+        internal virtual Option<JsonObject> ExecuteQueryAndLoadJsonObjectFromKey(DbCommand command)
         {
             using (DbDataReader reader = command.ExecuteReader())
             {
@@ -194,7 +194,7 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
 
                     try
                     {
-                        return Option<JObject>.Some(JObject.Parse(keyString));
+                        return Option<JsonObject>.Some(JsonObject.Parse(keyString).AsObject());
                     }
                     catch (JsonException e)
                     {
@@ -203,7 +203,7 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
                 }
             }
 
-            return Option<JObject>.None;
+            return Option<JsonObject>.None;
         }
 
         internal virtual DbConnection GetConnection()

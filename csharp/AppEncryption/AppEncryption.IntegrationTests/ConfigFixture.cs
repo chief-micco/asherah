@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Nodes;
 using GoDaddy.Asherah.AppEncryption.IntegrationTests.TestHelpers;
 using GoDaddy.Asherah.AppEncryption.Kms;
 using GoDaddy.Asherah.AppEncryption.Persistence;
 using GoDaddy.Asherah.Crypto.Exceptions;
 using Microsoft.Extensions.Configuration;
 using MySql.Data.MySqlClient;
-using Newtonsoft.Json.Linq;
 
 using static GoDaddy.Asherah.AppEncryption.IntegrationTests.TestHelpers.Constants;
 
@@ -48,7 +48,7 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests
 
         public KeyManagementService KeyManagementService { get; }
 
-        public IMetastore<JObject> Metastore { get; }
+        public IMetastore<JsonObject> Metastore { get; }
 
         private string PreferredRegion { get; set; }
 
@@ -72,7 +72,7 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests
             return paramValue;
         }
 
-        private IMetastore<JObject> CreateMetastore()
+        private IMetastore<JsonObject> CreateMetastore()
         {
             if (MetastoreType.Equals(MetastoreAdo, StringComparison.InvariantCultureIgnoreCase))
             {
@@ -93,7 +93,7 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests
                 return DynamoDbMetastoreImpl.NewBuilder("us-west-2").Build();
             }
 
-            return new InMemoryMetastoreImpl<JObject>();
+            return new InMemoryMetastoreImpl<JsonObject>();
         }
 
         private KeyManagementService CreateKeyManagementService()

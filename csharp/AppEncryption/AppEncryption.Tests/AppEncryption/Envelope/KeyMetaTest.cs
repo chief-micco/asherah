@@ -1,7 +1,7 @@
 using System;
+using System.Text.Json.Nodes;
 using GoDaddy.Asherah.AppEncryption.Envelope;
 using GoDaddy.Asherah.Crypto.ExtensionMethods;
-using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Envelope
@@ -44,9 +44,9 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Envelope
         [Fact]
         private void TestToJson()
         {
-            JObject metaJson = keyMeta.ToJson();
-            Assert.Equal(KeyId, metaJson.GetValue("KeyId").ToObject<string>());
-            Assert.Equal(created.ToUnixTimeSeconds(), metaJson.GetValue("Created").ToObject<long>());
+            JsonObject metaJson = keyMeta.ToJson();
+            Assert.Equal(KeyId, metaJson["KeyId"].GetValue<string>());
+            Assert.Equal(created.ToUnixTimeSeconds(), metaJson["Created"].GetValue<long>());
         }
 
         [Fact]

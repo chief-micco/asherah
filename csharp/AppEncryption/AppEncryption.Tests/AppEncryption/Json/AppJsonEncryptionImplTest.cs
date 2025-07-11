@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json.Nodes;
 using GoDaddy.Asherah.AppEncryption.Envelope;
 using GoDaddy.Asherah.AppEncryption.Kms;
 using GoDaddy.Asherah.AppEncryption.Persistence;
@@ -9,7 +10,6 @@ using GoDaddy.Asherah.Crypto.Engine.BouncyCastle;
 using GoDaddy.Asherah.Crypto.Envelope;
 using GoDaddy.Asherah.Crypto.Keys;
 using LanguageExt;
-using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Json
@@ -17,21 +17,21 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Json
     [Collection("Logger Fixture collection")]
     public class AppJsonEncryptionImplTest : IClassFixture<MetricsFixture>
     {
-        private readonly IMetastore<JObject> metastore;
-        private readonly Persistence<JObject> dataPersistence;
+        private readonly IMetastore<JsonObject> metastore;
+        private readonly Persistence<JsonObject> dataPersistence;
         private readonly Partition partition;
         private readonly KeyManagementService keyManagementService;
 
         public AppJsonEncryptionImplTest()
         {
             partition = new DefaultPartition("PARTITION", "SYSTEM", "PRODUCT");
-            Dictionary<string, JObject> memoryPersistence = new Dictionary<string, JObject>();
+            Dictionary<string, JsonObject> memoryPersistence = new Dictionary<string, JsonObject>();
 
-            dataPersistence = new AdhocPersistence<JObject>(
-                key => memoryPersistence.TryGetValue(key, out JObject result) ? result : Option<JObject>.None,
+            dataPersistence = new AdhocPersistence<JsonObject>(
+                key => memoryPersistence.TryGetValue(key, out JsonObject result) ? result : Option<JsonObject>.None,
                 (key, jsonObject) => memoryPersistence.Add(key, jsonObject));
 
-            metastore = new InMemoryMetastoreImpl<JObject>();
+            metastore = new InMemoryMetastoreImpl<JsonObject>();
             keyManagementService = new DummyKeyManagementService();
 
             AeadEnvelopeCrypto aeadEnvelopeCrypto = new BouncyAes256GcmCrypto();
@@ -62,7 +62,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Json
             using (SecureCryptoKeyDictionary<DateTimeOffset> secureCryptoKeyDictionary =
                 new SecureCryptoKeyDictionary<DateTimeOffset>(cryptoPolicy.GetRevokeCheckPeriodMillis()))
             {
-                IEnvelopeEncryption<JObject> envelopeEncryptionJsonImpl = new EnvelopeEncryptionJsonImpl(
+                IEnvelopeEncryption<JsonObject> envelopeEncryptionJsonImpl = new EnvelopeEncryptionJsonImpl(
                     partition,
                     metastore,
                     secureCryptoKeyDictionary,
@@ -70,17 +70,17 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Json
                     aeadEnvelopeCrypto,
                     cryptoPolicy,
                     keyManagementService);
-                using (Session<JObject, JObject> sessionJsonImpl =
-                    new SessionJsonImpl<JObject>(envelopeEncryptionJsonImpl))
+                using (Session<JsonObject, JsonObject> sessionJsonImpl =
+                    new SessionJsonImpl<JsonObject>(envelopeEncryptionJsonImpl))
                 {
                     Asherah.AppEncryption.Util.Json testJson = new Asherah.AppEncryption.Util.Json();
                     testJson.Put("Test", testData);
 
                     string persistenceKey = sessionJsonImpl.Store(testJson.ToJObject(), dataPersistence);
 
-                    Option<JObject> testJson2 = sessionJsonImpl.Load(persistenceKey, dataPersistence);
+                    Option<JsonObject> testJson2 = sessionJsonImpl.Load(persistenceKey, dataPersistence);
                     Assert.True(testJson2.IsSome);
-                    string resultData = ((JObject)testJson2)["Test"].ToObject<string>();
+                    string resultData = ((JsonObject)testJson2)["Test"].GetValue<string>();
 
                     Assert.Equal(testData, resultData);
                 }

@@ -1,8 +1,8 @@
 using System;
+using System.Text.Json.Nodes;
 using GoDaddy.Asherah.AppEncryption.IntegrationTests.Utils;
 using GoDaddy.Asherah.AppEncryption.Persistence;
 using LanguageExt;
-using Newtonsoft.Json.Linq;
 using Xunit;
 using Xunit.Sdk;
 
@@ -16,10 +16,10 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
         private static readonly Persistence<byte[]> PersistenceBytes =
             PersistenceFactory<byte[]>.CreateInMemoryPersistence();
 
-        private readonly JObject payload;
+        private readonly JsonObject payload;
         private readonly SessionFactory sessionFactory;
         private readonly string partitionId;
-        private readonly Session<JObject, byte[]> sessionJson;
+        private readonly Session<JsonObject, byte[]> sessionJson;
 
         public SessionJsonTest(ConfigFixture configFixture)
         {
@@ -41,7 +41,7 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
         private void JsonEncryptDecrypt()
         {
             byte[] dataRowRecord = sessionJson.Encrypt(payload);
-            JObject decryptedPayload = sessionJson.Decrypt(dataRowRecord);
+            JsonObject decryptedPayload = sessionJson.Decrypt(dataRowRecord);
 
             Assert.Equal(payload, decryptedPayload);
         }
@@ -54,7 +54,7 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
             for (int i = 0; i < iterations; i++)
             {
                 byte[] dataRowRecord = sessionJson.Encrypt(payload);
-                JObject decryptedPayload = sessionJson.Decrypt(dataRowRecord);
+                JsonObject decryptedPayload = sessionJson.Decrypt(dataRowRecord);
 
                 Assert.Equal(payload, decryptedPayload);
             }
@@ -65,11 +65,11 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
         {
             string persistenceKey = sessionJson.Store(payload, PersistenceBytes);
 
-            Option<JObject> decryptedPayload = sessionJson.Load(persistenceKey, PersistenceBytes);
+            Option<JsonObject> decryptedPayload = sessionJson.Load(persistenceKey, PersistenceBytes);
 
             if (decryptedPayload.IsSome)
             {
-                Assert.Equal(payload, (JObject)decryptedPayload);
+                Assert.Equal(payload, (JsonObject)decryptedPayload);
             }
             else
             {
@@ -82,7 +82,7 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
         {
             string persistenceKey = "1234";
 
-            Option<JObject> decryptedPayload = sessionJson.Load(persistenceKey, PersistenceBytes);
+            Option<JsonObject> decryptedPayload = sessionJson.Load(persistenceKey, PersistenceBytes);
 
             Assert.False(decryptedPayload.IsSome);
         }
@@ -92,10 +92,10 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
         {
             byte[] dataRowRecord = sessionJson.Encrypt(payload);
 
-            using (Session<JObject, byte[]> sessionBytesNew =
+            using (Session<JsonObject, byte[]> sessionBytesNew =
                 sessionFactory.GetSessionJson(partitionId))
             {
-                JObject decryptedPayload = sessionBytesNew.Decrypt(dataRowRecord);
+                JsonObject decryptedPayload = sessionBytesNew.Decrypt(dataRowRecord);
                 Assert.Equal(payload, decryptedPayload);
             }
         }
@@ -103,12 +103,12 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
         [Fact]
         private void JsonEncryptDecryptWithDifferentPayloads()
         {
-            JObject otherPayload = PayloadGenerator.CreateDefaultRandomJsonPayload();
+            JsonObject otherPayload = PayloadGenerator.CreateDefaultRandomJsonPayload();
             byte[] dataRowRecord1 = sessionJson.Encrypt(payload);
             byte[] dataRowRecord2 = sessionJson.Encrypt(otherPayload);
 
-            JObject decryptedPayload1 = sessionJson.Decrypt(dataRowRecord1);
-            JObject decryptedPayload2 = sessionJson.Decrypt(dataRowRecord2);
+            JsonObject decryptedPayload1 = sessionJson.Decrypt(dataRowRecord1);
+            JsonObject decryptedPayload2 = sessionJson.Decrypt(dataRowRecord2);
 
             Assert.Equal(payload, decryptedPayload1);
             Assert.Equal(otherPayload, decryptedPayload2);
@@ -118,13 +118,13 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
         private void JsonStoreOverwritePayload()
         {
             string key = "some_key";
-            JObject otherPayload = PayloadGenerator.CreateDefaultRandomJsonPayload();
+            JsonObject otherPayload = PayloadGenerator.CreateDefaultRandomJsonPayload();
 
             sessionJson.Store(key, payload, PersistenceBytes);
             sessionJson.Store(key, otherPayload, PersistenceBytes);
-            Option<JObject> decryptedPayload = sessionJson.Load(key, PersistenceBytes);
+            Option<JsonObject> decryptedPayload = sessionJson.Load(key, PersistenceBytes);
 
-            Assert.Equal(otherPayload, (JObject)decryptedPayload);
+            Assert.Equal(otherPayload, (JsonObject)decryptedPayload);
         }
     }
 }

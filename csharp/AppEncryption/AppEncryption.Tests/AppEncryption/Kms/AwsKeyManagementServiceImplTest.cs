@@ -4,12 +4,13 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using Amazon.KeyManagementService;
 using Amazon.KeyManagementService.Model;
 using Amazon.Runtime;
-using Amazon.Runtime.SharedInterfaces;
 using GoDaddy.Asherah.AppEncryption.Exceptions;
 using GoDaddy.Asherah.AppEncryption.Kms;
 using GoDaddy.Asherah.Crypto.Envelope;
@@ -17,7 +18,6 @@ using GoDaddy.Asherah.Crypto.Exceptions;
 using GoDaddy.Asherah.Crypto.Keys;
 using LanguageExt;
 using Moq;
-using Newtonsoft.Json.Linq;
 using Xunit;
 
 using static GoDaddy.Asherah.AppEncryption.Kms.AwsKeyManagementServiceImpl;
@@ -88,7 +88,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Kms
             byte[] encryptedKey = { 0, 1 };
             byte[] kmsKeyEncryptionKey = { 2, 3 };
 
-            JObject kmsKeyEnvelopeTest = JObject.FromObject(new Dictionary<string, object>
+            JsonObject kmsKeyEnvelopeTest = JsonSerializer.SerializeToNode(new Dictionary<string, object>
             {
                 { EncryptedKey, Convert.ToBase64String(encryptedKey) },
                 {
@@ -102,7 +102,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Kms
                         },
                     }
                 },
-            });
+            }).AsObject();
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
             bool revoked = false;
@@ -127,7 +127,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Kms
             byte[] encryptedKey = { 0, 1 };
             byte[] kmsKeyEncryptionKey = { 2, 3 };
 
-            JObject kmsKeyEnvelope = JObject.FromObject(new Dictionary<string, object>
+            JsonObject kmsKeyEnvelope = JsonSerializer.SerializeToNode(new Dictionary<string, object>
             {
                 { EncryptedKey, Convert.ToBase64String(encryptedKey) },
                 {
@@ -147,7 +147,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Kms
                         },
                     }
                 },
-            });
+            }).AsObject();
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
             bool revoked = false;
@@ -171,7 +171,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Kms
         {
             byte[] encryptedKey = { 0, 1 };
             byte[] kmsKeyEncryptionKey = { 2, 3 };
-            JObject kmsKeyEnvelope = JObject.FromObject(new Dictionary<string, object>
+            JsonObject kmsKeyEnvelope = JsonSerializer.SerializeToNode(new Dictionary<string, object>
             {
                 { EncryptedKey, Convert.ToBase64String(encryptedKey) },
                 {
@@ -185,7 +185,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Kms
                         },
                     }
                 },
-            });
+            }).AsObject();
 
             awsKeyManagementServiceImplSpy
                 .Setup(x => x.DecryptKmsEncryptedKey(
@@ -204,12 +204,12 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Kms
         private void TestGetPrioritizedKmsRegionKeyJsonList()
         {
             string json =
-                $@"[{{ '{RegionKey}':'{UsEast1}' }}, {{ '{RegionKey}':'a' }},
-                    {{ '{RegionKey}':'zzzzzz' }}, {{ '{RegionKey}':'{preferredRegion}' }}]";
+                $@"[{{ ""{RegionKey}"":""{UsEast1}"" }}, {{ ""{RegionKey}"":""a"" }},
+                    {{ ""{RegionKey}"":""zzzzzz"" }}, {{ ""{RegionKey}"":""{preferredRegion}"" }}]";
 
             // region 'a' should always be lexicographically first and region 'zzzzzz' should always be
             // lexicographically last
-            JArray regionArray = JArray.Parse(json);
+            JsonArray regionArray = JsonArray.Parse(json).AsArray();
             List<Asherah.AppEncryption.Util.Json> ret =
                 awsKeyManagementServiceImplSpy.Object.GetPrioritizedKmsRegionKeyJsonList(regionArray);
             Assert.Equal(preferredRegion, ret[0].GetString(RegionKey));
@@ -363,13 +363,13 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Kms
                 .Setup(x => x.EncryptAsync(It.IsAny<EncryptRequest>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.FromResult(encryptResponse));
 
-            Option<JObject> actualResult = awsKeyManagementServiceImplSpy.Object.EncryptKeyAndBuildResult(
+            Option<JsonObject> actualResult = awsKeyManagementServiceImplSpy.Object.EncryptKeyAndBuildResult(
                 amazonKeyManagementServiceClientMock.Object, preferredRegion, ArnUsWest1, dataKeyPlainText);
 
-            Assert.Equal(preferredRegion, ((JObject)actualResult).GetValue(RegionKey).ToString());
-            Assert.Equal(ArnUsWest1, ((JObject)actualResult).GetValue(ArnKey).ToString());
+            Assert.Equal(preferredRegion, ((JsonObject)actualResult)[RegionKey].GetValue<string>());
+            Assert.Equal(ArnUsWest1, ((JsonObject)actualResult)[ArnKey].GetValue<string>());
             Assert.Equal(
-                encryptedKey, Convert.FromBase64String(((JObject)actualResult).GetValue(EncryptedKek).ToString()));
+                encryptedKey, Convert.FromBase64String(((JsonObject)actualResult)[EncryptedKek].GetValue<string>()));
         }
 
         [Fact]
@@ -379,13 +379,13 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Kms
             amazonKeyManagementServiceClientMock
                 .Setup(x => x.EncryptAsync(It.IsAny<EncryptRequest>(), It.IsAny<CancellationToken>()))
                 .Throws<AggregateException>();
-            Option<JObject> actualResult = awsKeyManagementServiceImplSpy.Object.EncryptKeyAndBuildResult(
+            Option<JsonObject> actualResult = awsKeyManagementServiceImplSpy.Object.EncryptKeyAndBuildResult(
                 amazonKeyManagementServiceClientMock.Object,
                 preferredRegion,
                 ArnUsWest1,
                 dataKeyPlainText);
 
-            Assert.Equal(Option<JObject>.None, actualResult);
+            Assert.Equal(Option<JsonObject>.None, actualResult);
         }
 
         [Fact]
@@ -396,14 +396,14 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Kms
             byte[] dataKeyCipherText = { 5, 6 };
             byte[] encryptKeyCipherText = { 7, 8 };
 
-            JObject encryptKeyAndBuildResultJson = JObject.FromObject(new Dictionary<string, object>
+            JsonObject encryptKeyAndBuildResultJson = JsonSerializer.SerializeToNode(new Dictionary<string, object>
             {
                 { RegionKey, UsEast1 },
                 { ArnKey, ArnUsEast1 },
                 { EncryptedKek, Convert.ToBase64String(encryptKeyCipherText) },
-            });
+            }).AsObject();
 
-            JObject kmsKeyEnvelope = JObject.FromObject(new Dictionary<string, object>
+            JsonObject kmsKeyEnvelope = JsonSerializer.SerializeToNode(new Dictionary<string, object>
             {
                 { EncryptedKey, Convert.ToBase64String(encryptedKey) },
                 {
@@ -418,7 +418,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Kms
                         encryptKeyAndBuildResultJson,
                     }
                 },
-            });
+            }).AsObject();
             GenerateDataKeyResponse generateDataKeyResult = new GenerateDataKeyResponse
             {
                 Plaintext = new MemoryStream(dataKeyPlainText, 0, dataKeyPlainText.Length, true, true),
@@ -444,24 +444,39 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Kms
                         UsEast1,
                         ArnUsEast1,
                         dataKeyPlainText))
-                .Returns(Option<JObject>.Some(encryptKeyAndBuildResultJson));
+                .Returns(Option<JsonObject>.Some(encryptKeyAndBuildResultJson));
 
             byte[] encryptedResult = awsKeyManagementServiceImplSpy.Object.EncryptKey(cryptoKeyMock.Object);
-            JObject kmsKeyEnvelopeResult = new Asherah.AppEncryption.Util.Json(encryptedResult).ToJObject();
+            JsonObject kmsKeyEnvelopeResult = new Asherah.AppEncryption.Util.Json(encryptedResult).ToJObject();
 
             Assert.Equal(new byte[] { 0, 0 }, dataKeyPlainText);
 
             // This is a workaround for https://github.com/JamesNK/Newtonsoft.Json/issues/1437
             // If DeepEquals fails due to mismatching array order, compare the elements individually
-            if (!JToken.DeepEquals(kmsKeyEnvelope, kmsKeyEnvelopeResult))
+            if (!JsonNode.DeepEquals(kmsKeyEnvelope, kmsKeyEnvelopeResult))
             {
-                JArray kmsKeyEnvelopeKmsKeks = JArray.FromObject(kmsKeyEnvelope[KmsKeksKey]
-                    .OrderBy(k => k[RegionKey]));
-                JArray kmsKeyEnvelopeResultKmsKeks = JArray.FromObject(kmsKeyEnvelopeResult[KmsKeksKey]
-                    .OrderBy(k => k[RegionKey]));
+                var kmsKeyEnvelopeKmsKeks = JsonSerializer.SerializeToDocument(kmsKeyEnvelope[KmsKeksKey]);
+                var kmsKeyEnvelopeResultKmsKeks = JsonSerializer.SerializeToDocument(kmsKeyEnvelopeResult[KmsKeksKey]);
 
-                Assert.True(JToken.DeepEquals(kmsKeyEnvelope[EncryptedKey], kmsKeyEnvelopeResult[EncryptedKey]));
-                Assert.True(JToken.DeepEquals(kmsKeyEnvelopeKmsKeks, kmsKeyEnvelopeResultKmsKeks));
+                var sortedKeks = kmsKeyEnvelopeKmsKeks.RootElement.EnumerateArray()
+                    .OrderBy(x => x.GetProperty(RegionKey).GetString()).ToArray();
+                var sortedResultKeks = kmsKeyEnvelopeResultKmsKeks.RootElement.EnumerateArray()
+                    .OrderBy(x => x.GetProperty(RegionKey).GetString()).ToArray();
+
+                var keksArray = new JsonArray();
+                foreach (var kek in sortedKeks)
+                {
+                    keksArray.Add(kek);
+                }
+
+                var keksResultArray = new JsonArray();
+                foreach (var kek in sortedResultKeks)
+                {
+                    keksResultArray.Add(kek);
+                }
+
+                Assert.True(JsonNode.DeepEquals(kmsKeyEnvelope[EncryptedKey], kmsKeyEnvelopeResult[EncryptedKey]));
+                Assert.True(JsonNode.DeepEquals(keksArray, keksResultArray));
             }
         }
 

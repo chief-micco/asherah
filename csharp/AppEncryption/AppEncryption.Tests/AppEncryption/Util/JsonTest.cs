@@ -1,8 +1,8 @@
 using System;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using LanguageExt;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Util
@@ -21,20 +21,20 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Util
         public void TestJsonDateParsing()
         {
             string time = DateTime.UtcNow.ToString("o");
-            JObject jObject = new JObject
+            JsonObject jObject = new JsonObject
             {
                 { "Created", 1541461380 },
                 { "Time", time },
             };
 
             // Get json bytes
-            byte[] jsonBytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(jObject));
+            byte[] jsonBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(jObject));
 
             // Convert to JObject using the Asherah.AppEncryption.Util.Json class. This in turn calls the
             // ConvertUtf8ToJson method which sets the DateParseHandling to None
-            JObject json = new Asherah.AppEncryption.Util.Json(jsonBytes).ToJObject();
+            JsonObject json = new Asherah.AppEncryption.Util.Json(jsonBytes).ToJObject();
 
-            Assert.Equal(time, json.GetValue("Time").ToString());
+            Assert.Equal(time, json["Time"].GetValue<string>());
         }
 
         [Fact]
@@ -113,7 +113,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Util
             string jsonString = string.Concat("{\"", key, "\":", unixTimeStampString, "}");
             DateTimeOffset expectedDateTimeOffset = new DateTimeOffset(2019, 3, 21, 23, 24, 0, TimeSpan.Zero);
 
-            Asherah.AppEncryption.Util.Json json = new Asherah.AppEncryption.Util.Json(JObject.Parse(jsonString));
+            Asherah.AppEncryption.Util.Json json = new Asherah.AppEncryption.Util.Json(JsonNode.Parse(jsonString).AsObject());
             DateTimeOffset actualDateTimeOffset = json.GetDateTimeOffset(key);
 
             Assert.Equal(expectedDateTimeOffset, actualDateTimeOffset);
@@ -158,11 +158,11 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Util
         [Fact]
         private void TestGetOptionalJsonWhenKeyExists()
         {
-            const string json = @"{key:'some_key', value:123}";
-            JObject someMeta = JObject.Parse(json);
+            const string json = "{\"key\":\"some_key\", \"value\":123}";
+            JsonObject someMeta = JsonObject.Parse(json).AsObject();
             testDocument.Put("ParentKeyMeta", someMeta);
             Option<Asherah.AppEncryption.Util.Json> resultJson = testDocument.GetOptionalJson("ParentKeyMeta");
-            Assert.True(JToken.DeepEquals(someMeta, resultJson.Map(json1 => json1.ToJObject()).IfNone(new JObject())));
+            Assert.True(JsonNode.DeepEquals(someMeta, resultJson.Map(json1 => json1.ToJObject()).IfNone(new JsonObject())));
         }
     }
 }

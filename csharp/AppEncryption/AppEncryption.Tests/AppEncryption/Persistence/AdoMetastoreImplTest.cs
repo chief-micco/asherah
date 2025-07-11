@@ -1,12 +1,12 @@
 using System;
 using System.Data;
 using System.Data.Common;
+using System.Text.Json.Nodes;
 using GoDaddy.Asherah.AppEncryption.Persistence;
+using GoDaddy.Asherah.AppEncryption.Util;
 using LanguageExt;
 using Moq;
 using MySql.Data.MySqlClient;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using Xunit;
 using static GoDaddy.Asherah.AppEncryption.Persistence.AdoMetastoreImpl;
 
@@ -156,10 +156,10 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
                 adoMetastoreImplSpy.Object.AddParameter(command, Id, keyStringKey);
                 adoMetastoreImplSpy.Object.AddParameter(command, Created, created.UtcDateTime);
 
-                Option<JObject> actualJsonObject =
+                Option<JsonObject> actualJsonObject =
                     adoMetastoreImplSpy.Object.ExecuteQueryAndLoadJsonObjectFromKey(command);
                 Assert.True(actualJsonObject.IsSome);
-                Assert.Equal(keyStringValue, ((JObject)actualJsonObject).ToString(Formatting.None));
+                Assert.Equal(keyStringValue, ((JsonObject)actualJsonObject).ToJsonString(Serialization.NoFormatting));
             }
         }
 
@@ -174,9 +174,9 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
                 adoMetastoreImplSpy.Object.AddParameter(command, Id, "non_existent_key");
                 adoMetastoreImplSpy.Object.AddParameter(command, Created, created.UtcDateTime);
 
-                Option<JObject> actualJsonObject =
+                Option<JsonObject> actualJsonObject =
                     adoMetastoreImplSpy.Object.ExecuteQueryAndLoadJsonObjectFromKey(command);
-                Assert.Equal(Option<JObject>.None, actualJsonObject);
+                Assert.Equal(Option<JsonObject>.None, actualJsonObject);
             }
         }
 
@@ -191,10 +191,10 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
                 adoMetastoreImplSpy.Object.AddParameter(command, Id, MalformedKeyStringKey);
                 adoMetastoreImplSpy.Object.AddParameter(command, Created, created.UtcDateTime);
 
-                Option<JObject> actualValue =
+                Option<JsonObject> actualValue =
                     adoMetastoreImplSpy.Object.ExecuteQueryAndLoadJsonObjectFromKey(command);
 
-                Assert.Equal(Option<JObject>.None, actualValue);
+                Assert.Equal(Option<JsonObject>.None, actualValue);
             }
         }
 
@@ -202,9 +202,9 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
         private void TestLoad()
         {
             string keyId = KeyStringWithParentKeyMetaKey;
-            Option<JObject> actualJsonObject = adoMetastoreImplSpy.Object.Load(keyId, created.UtcDateTime);
+            Option<JsonObject> actualJsonObject = adoMetastoreImplSpy.Object.Load(keyId, created.UtcDateTime);
             Assert.True(actualJsonObject.IsSome);
-            Assert.Equal(KeyStringWithParentKeyMetaValue, ((JObject)actualJsonObject).ToString(Formatting.None));
+            Assert.Equal(KeyStringWithParentKeyMetaValue, ((JsonObject)actualJsonObject).ToJsonString(Serialization.NoFormatting));
         }
 
         [Fact]
@@ -213,17 +213,17 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             AdoMetastoreImpl adoMetastoreImpl =
                 NewBuilder(dbProviderFactory, fakeDbConnectionStringBuilder.ConnectionString).Build();
             string keyId = KeyStringWithParentKeyMetaKey;
-            Option<JObject> actualJsonObject = adoMetastoreImpl.Load(keyId, created.UtcDateTime);
-            Assert.Equal(Option<JObject>.None, actualJsonObject);
+            Option<JsonObject> actualJsonObject = adoMetastoreImpl.Load(keyId, created.UtcDateTime);
+            Assert.Equal(Option<JsonObject>.None, actualJsonObject);
         }
 
         [Fact]
         private void TestLoadLatest()
         {
             string keyId = KeyStringWithParentKeyMetaKey;
-            Option<JObject> actualJsonObject = adoMetastoreImplSpy.Object.LoadLatest(keyId);
+            Option<JsonObject> actualJsonObject = adoMetastoreImplSpy.Object.LoadLatest(keyId);
             Assert.True(actualJsonObject.IsSome);
-            Assert.Equal(KeyStringLatestValue, ((JObject)actualJsonObject).ToString(Formatting.None));
+            Assert.Equal(KeyStringLatestValue, ((JsonObject)actualJsonObject).ToJsonString(Serialization.NoFormatting));
         }
 
         [Fact]
@@ -232,8 +232,8 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             AdoMetastoreImpl adoMetastoreImpl =
                 NewBuilder(dbProviderFactory, fakeDbConnectionStringBuilder.ConnectionString).Build();
             string keyId = KeyStringWithParentKeyMetaKey;
-            Option<JObject> actualJsonObject = adoMetastoreImpl.LoadLatest(keyId);
-            Assert.Equal(Option<JObject>.None, actualJsonObject);
+            Option<JsonObject> actualJsonObject = adoMetastoreImpl.LoadLatest(keyId);
+            Assert.Equal(Option<JsonObject>.None, actualJsonObject);
         }
 
         [Fact]
@@ -243,7 +243,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             bool actualValue = adoMetastoreImplSpy.Object.Store(
                 keyId,
                 DateTimeOffset.UtcNow,
-                JObject.Parse(KeyStringLatestValue));
+                JsonObject.Parse(KeyStringLatestValue).AsObject());
             Assert.True(actualValue);
         }
 
@@ -253,7 +253,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             AdoMetastoreImpl adoMetastoreImpl =
                 NewBuilder(dbProviderFactory, fakeDbConnectionStringBuilder.ConnectionString).Build();
             string keyId = KeyStringWithParentKeyMetaKey;
-            bool actualValue = adoMetastoreImpl.Store(keyId, DateTimeOffset.UtcNow, new JObject());
+            bool actualValue = adoMetastoreImpl.Store(keyId, DateTimeOffset.UtcNow, new JsonObject());
             Assert.False(actualValue);
         }
 
@@ -264,7 +264,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             bool actualValue = adoMetastoreImplSpy.Object.Store(
                 keyId,
                 created.UtcDateTime,
-                JObject.Parse(KeyStringWithParentKeyMetaValue));
+                JsonObject.Parse(KeyStringWithParentKeyMetaValue).AsObject());
             Assert.False(actualValue);
         }
 
@@ -289,7 +289,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             Assert.Equal(ConnectionState.Open, dbConnection.State);
 
             adoMetastoreImplSpy.Setup(x => x.ExecuteQueryAndLoadJsonObjectFromKey(dbCommandMock.Object))
-                .Returns(Option<JObject>.None);
+                .Returns(Option<JsonObject>.None);
             adoMetastoreImplSpy
                 .Setup(x => x.AddParameter(It.IsAny<DbCommand>(), It.IsAny<string>(), It.IsAny<object>())).Verifiable();
             adoMetastoreImplSpy.Object.Load(KeyStringWithParentKeyMetaKey, created.UtcDateTime);
@@ -309,7 +309,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             Assert.Equal(ConnectionState.Open, dbConnection.State);
 
             adoMetastoreImplSpy.Setup(x => x.ExecuteQueryAndLoadJsonObjectFromKey(dbCommandMock.Object))
-                .Returns(Option<JObject>.None);
+                .Returns(Option<JsonObject>.None);
             adoMetastoreImplSpy
                 .Setup(x => x.AddParameter(It.IsAny<DbCommand>(), It.IsAny<string>(), It.IsAny<object>())).Verifiable();
             adoMetastoreImplSpy.Object.LoadLatest(KeyStringWithParentKeyMetaKey);
@@ -335,7 +335,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             adoMetastoreImplSpy.Object.Store(
                 KeyStringWithNoParentKeyMetaKey,
                 created.UtcDateTime,
-                JObject.Parse(KeyStringWithNoParentKeyMetaValue));
+                JsonObject.Parse(KeyStringWithNoParentKeyMetaValue).AsObject());
 
             // Verify that DbConnection is closed at the end of the function call
             Assert.Equal(ConnectionState.Closed, dbConnection.State);

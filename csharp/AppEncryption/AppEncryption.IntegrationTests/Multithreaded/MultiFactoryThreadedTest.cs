@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json.Nodes;
 using System.Threading;
 using System.Threading.Tasks;
 using GoDaddy.Asherah.AppEncryption.IntegrationTests.Utils;
 using GoDaddy.Asherah.Logging;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 using Xunit;
 using static GoDaddy.Asherah.AppEncryption.IntegrationTests.TestHelpers.Constants;
 
@@ -96,7 +96,7 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Multithreaded
                         configFixture.KeyManagementService,
                         configFixture.Metastore))
                 {
-                    using (Session<JObject, byte[]> session = sessionFactory.GetSessionJson(partitionId))
+                    using (Session<JsonObject, byte[]> session = sessionFactory.GetSessionJson(partitionId))
                     {
                         Dictionary<string, byte[]> dataStore = new Dictionary<string, byte[]>();
 
@@ -105,7 +105,7 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Multithreaded
                         for (int i = 0; i < testIterations; i++)
                         {
                             // Note the size will be slightly larger since we're adding extra unique meta
-                            JObject jObject = PayloadGenerator.CreateRandomJsonPayload(payloadSizeBytesBase);
+                            JsonObject jObject = PayloadGenerator.CreateRandomJsonPayload(payloadSizeBytesBase);
                             string keyPart = $"iteration-{i}";
                             jObject["payload"] = partitionPart + keyPart;
 
@@ -114,8 +114,8 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Multithreaded
 
                         foreach (KeyValuePair<string, byte[]> keyValuePair in dataStore)
                         {
-                            JObject decryptedObject = session.Decrypt(keyValuePair.Value);
-                            Assert.Equal(partitionPart + keyValuePair.Key, decryptedObject["payload"].ToObject<string>());
+                            JsonObject decryptedObject = session.Decrypt(keyValuePair.Value);
+                            Assert.Equal(partitionPart + keyValuePair.Key, decryptedObject["payload"].GetValue<string>());
                         }
                     }
                 }

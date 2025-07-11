@@ -16,5 +16,8 @@
 
     <!-- SA1652:EnableXmlDocumentationOutput - https://github.com/DotNetAnalyzers/StyleCopAnalyzers/blob/master/documentation/SA1652.md -->
     <Rule Id="SA1652" Action="None" />
+
+    <!-- SA1600:ElementsMustBeDocumented -->
+    <Rule Id="SA1600" Action="None" />
   </Rules>
 </RuleSet>

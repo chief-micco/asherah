@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json.Nodes;
 using GoDaddy.Asherah.AppEncryption.Envelope;
 using GoDaddy.Asherah.AppEncryption.IntegrationTests.TestHelpers;
 using GoDaddy.Asherah.AppEncryption.Kms;
@@ -7,7 +8,6 @@ using GoDaddy.Asherah.Crypto.Engine.BouncyCastle;
 using GoDaddy.Asherah.Crypto.Envelope;
 using GoDaddy.Asherah.Crypto.Keys;
 using Moq;
-using Newtonsoft.Json.Linq;
 
 namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
 {
@@ -15,17 +15,17 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
     {
         private static readonly AeadEnvelopeCrypto Crypto = new BouncyAes256GcmCrypto();
 
-        internal static Mock<IMetastore<JObject>> CreateMetastoreMock(
+        internal static Mock<IMetastore<JsonObject>> CreateMetastoreMock(
             Partition partition,
             KeyManagementService kms,
             KeyState metaIK,
             KeyState metaSK,
             CryptoKeyHolder cryptoKeyHolder,
-            IMetastore<JObject> metastore)
+            IMetastore<JsonObject> metastore)
         {
             CryptoKey systemKey = cryptoKeyHolder.SystemKey;
 
-            Mock<IMetastore<JObject>> metastoreSpy = new Mock<IMetastore<JObject>>();
+            Mock<IMetastore<JsonObject>> metastoreSpy = new Mock<IMetastore<JsonObject>>();
 
             metastoreSpy
                 .Setup(x => x.Load(It.IsAny<string>(), It.IsAny<DateTimeOffset>()))
@@ -34,8 +34,8 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression
                 .Setup(x => x.LoadLatest(It.IsAny<string>()))
                 .Returns<string>(metastore.LoadLatest);
             metastoreSpy
-                .Setup(x => x.Store(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<JObject>()))
-                .Returns<string, DateTimeOffset, JObject>(metastore.Store);
+                .Setup(x => x.Store(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<JsonObject>()))
+                .Returns<string, DateTimeOffset, JsonObject>(metastore.Store);
 
             if (metaSK != KeyState.Empty)
             {

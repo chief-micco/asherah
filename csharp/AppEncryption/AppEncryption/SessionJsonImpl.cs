@@ -1,14 +1,14 @@
 using System;
+using System.Text.Json.Nodes;
 using GoDaddy.Asherah.AppEncryption.Envelope;
 using GoDaddy.Asherah.AppEncryption.Util;
 using GoDaddy.Asherah.Logging;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 
 namespace GoDaddy.Asherah.AppEncryption
 {
     /// <inheritdoc />
-    public class SessionJsonImpl<TD> : Session<JObject, TD>
+    public class SessionJsonImpl<TD> : Session<JsonObject, TD>
     {
         private static readonly ILogger Logger = LogManager.CreateLogger<SessionJsonImpl<TD>>();
 
@@ -28,14 +28,14 @@ namespace GoDaddy.Asherah.AppEncryption
         }
 
         /// <inheritdoc/>
-        public override JObject Decrypt(TD dataRowRecord)
+        public override JsonObject Decrypt(TD dataRowRecord)
         {
             byte[] jsonAsUtf8Bytes = envelopeEncryption.DecryptDataRowRecord(dataRowRecord);
             return new Json(jsonAsUtf8Bytes).ToJObject();
         }
 
         /// <inheritdoc/>
-        public override TD Encrypt(JObject payload)
+        public override TD Encrypt(JsonObject payload)
         {
             byte[] jsonAsUtf8Bytes = new Json(payload).ToUtf8();
             return envelopeEncryption.EncryptPayload(jsonAsUtf8Bytes);

@@ -5,11 +5,11 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IO;
 using System.Linq;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Amazon.KeyManagementService;
 using Amazon.KeyManagementService.Model;
 using Amazon.Runtime;
-using Amazon.Runtime.SharedInterfaces;
 using App.Metrics.Timer;
 using GoDaddy.Asherah.AppEncryption.Exceptions;
 using GoDaddy.Asherah.AppEncryption.Util;
@@ -21,7 +21,6 @@ using GoDaddy.Asherah.Crypto.Keys;
 using GoDaddy.Asherah.Logging;
 using LanguageExt;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 
 namespace GoDaddy.Asherah.AppEncryption.Kms
 {
@@ -130,7 +129,7 @@ namespace GoDaddy.Asherah.AppEncryption.Kms
         /// <param name="regionToArnDictionary">A dictionary with region and arn of the KMS key(s) as key value pairs.
         /// </param>
         /// <param name="region">Preferred region to use.</param>
-        /// <returns></returns>
+        /// <returns>Builder.</returns>
         public static Builder NewBuilder(Dictionary<string, string> regionToArnDictionary, string region)
         {
             return new Builder(regionToArnDictionary, region);
@@ -153,7 +152,7 @@ namespace GoDaddy.Asherah.AppEncryption.Kms
                     byte[] encryptedKey = crypto.EncryptKey(key, crypto.GenerateKeyFromBytes(dataKeyPlainText));
                     kmsKeyEnvelope.Put(EncryptedKey, encryptedKey);
 
-                    ConcurrentBag<JObject> kmsRegionKeyJsonBag = new ConcurrentBag<JObject>();
+                    ConcurrentBag<JsonObject> kmsRegionKeyJsonBag = new ConcurrentBag<JsonObject>();
                     Parallel.ForEach(RegionToArnAndClientDictionary.Cast<object>(), regionToArnClientObject =>
                     {
                         DictionaryEntry regionToArnAndClient = (DictionaryEntry)regionToArnClientObject;
@@ -171,7 +170,7 @@ namespace GoDaddy.Asherah.AppEncryption.Kms
                         else
                         {
                             // This is the datakey, so build kmsKey json for it
-                            kmsRegionKeyJsonBag.Add(Option<JObject>.Some(BuildKmsRegionKeyJson(
+                            kmsRegionKeyJsonBag.Add(Option<JsonObject>.Some(BuildKmsRegionKeyJson(
                                 region,
                                 dateKeyKeyId,
                                 dataKey.CiphertextBlob.GetBuffer())).IfNone(() => null));
@@ -239,7 +238,7 @@ namespace GoDaddy.Asherah.AppEncryption.Kms
             }
         }
 
-        internal virtual Option<JObject> EncryptKeyAndBuildResult(
+        internal virtual Option<JsonObject> EncryptKeyAndBuildResult(
             IAmazonKeyManagementService kmsClient,
             string region,
             string arn,
@@ -274,7 +273,7 @@ namespace GoDaddy.Asherah.AppEncryption.Kms
                             ciphertextStream.Read(ciphertextBytes, 0, ciphertextBytes.Length);
 
                             // Create the region key JSON
-                            return Option<JObject>.Some(BuildKmsRegionKeyJson(region, arn, ciphertextBytes));
+                            return Option<JsonObject>.Some(BuildKmsRegionKeyJson(region, arn, ciphertextBytes));
                         }
                     }
                 }
@@ -284,7 +283,7 @@ namespace GoDaddy.Asherah.AppEncryption.Kms
                 Logger.LogWarning(e, "Failed to encrypt generated data key via region {region} KMS", region);
 
                 // TODO Consider adding notification/CW alert
-                return Option<JObject>.None;
+                return Option<JsonObject>.None;
             }
         }
 
@@ -347,9 +346,9 @@ namespace GoDaddy.Asherah.AppEncryption.Kms
         ///
         /// <param name="kmsRegionKeyArray">A non-prioritized array of KMS region key objects.</param>
         /// <returns>A list of KMS region key json objects, prioritized by regions.</returns>
-        internal List<Json> GetPrioritizedKmsRegionKeyJsonList(JArray kmsRegionKeyArray)
+        internal List<Json> GetPrioritizedKmsRegionKeyJsonList(JsonArray kmsRegionKeyArray)
         {
-            List<Json> kmsRegionKeyList = kmsRegionKeyArray.Map(obj => new Json((JObject)obj)).ToList();
+            List<Json> kmsRegionKeyList = kmsRegionKeyArray.Map(obj => new Json((JsonObject)obj)).ToList();
             kmsRegionKeyList.Sort((kmsRegionKeyJson1, kmsRegionKeyJson2)
                 => regionPriorityComparator(kmsRegionKeyJson1.GetString(RegionKey), kmsRegionKeyJson1.GetString(RegionKey)));
             return kmsRegionKeyList;
@@ -393,7 +392,7 @@ namespace GoDaddy.Asherah.AppEncryption.Kms
             }
         }
 
-        private JObject BuildKmsRegionKeyJson(string region, string arn, byte[] encryptedKeyEncryptionKey)
+        private JsonObject BuildKmsRegionKeyJson(string region, string arn, byte[] encryptedKeyEncryptionKey)
         {
             // NOTE: ARN not needed in decrypt, but storing for now in case we want to later use for encryption context, policy, etc.
             Json kmsRegionKeyJson = new Json();
@@ -414,7 +413,6 @@ namespace GoDaddy.Asherah.AppEncryption.Kms
             /// <summary>
             /// Initializes the builder for <see cref="AwsKeyManagementServiceImpl"/> class with the specified options.
             /// </summary>
-            ///
             /// <param name="regionToArnDictionary">A dictionary with region and arn of the KMS key(s) as key value
             /// pairs.</param>
             /// <param name="region">The preferred region to choose.</param>

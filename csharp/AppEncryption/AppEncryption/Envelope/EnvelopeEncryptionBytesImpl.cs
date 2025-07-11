@@ -1,8 +1,8 @@
 using System;
+using System.Text.Json.Nodes;
 using GoDaddy.Asherah.AppEncryption.Util;
 using GoDaddy.Asherah.Logging;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 
 namespace GoDaddy.Asherah.AppEncryption.Envelope
 {
@@ -11,7 +11,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
     {
         private static readonly ILogger Logger = LogManager.CreateLogger<EnvelopeEncryptionBytesImpl>();
 
-        private readonly IEnvelopeEncryption<JObject> envelopeEncryptionJson;
+        private readonly IEnvelopeEncryption<JsonObject> envelopeEncryptionJson;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EnvelopeEncryptionBytesImpl"/> class using the provided
@@ -21,7 +21,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         ///
         /// <param name="envelopeEncryptionJson">An <see cref="IEnvelopeEncryption{TD}"/> object which uses
         /// <see cref="JObject"/> as Data Row Record format.</param>
-        public EnvelopeEncryptionBytesImpl(IEnvelopeEncryption<JObject> envelopeEncryptionJson)
+        public EnvelopeEncryptionBytesImpl(IEnvelopeEncryption<JsonObject> envelopeEncryptionJson)
         {
             this.envelopeEncryptionJson = envelopeEncryptionJson;
         }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Amazon;
 using Amazon.DynamoDBv2;
@@ -14,7 +15,6 @@ using GoDaddy.Asherah.Crypto.Exceptions;
 using GoDaddy.Asherah.Logging;
 using LanguageExt;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 
 [assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]
 [assembly: InternalsVisibleTo("AppEncryption.Tests")]
@@ -27,7 +27,7 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
     /// structure. It uses the default table name "EncryptionKey" but it can be configured using
     /// <see cref="IBuildStep.WithTableName"/> option. Stores the created time in unix time seconds.
     /// </summary>
-    public class DynamoDbMetastoreImpl : IMetastore<JObject>
+    public class DynamoDbMetastoreImpl : IMetastore<JsonObject>
     {
         internal const string PartitionKey = "Id";
         internal const string SortKey = "Created";
@@ -123,7 +123,7 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
         }
 
         /// <inheritdoc />
-        public Option<JObject> Load(string keyId, DateTimeOffset created)
+        public Option<JsonObject> Load(string keyId, DateTimeOffset created)
         {
             using (MetricsUtil.MetricsInstance.Measure.Timer.Time(LoadTimerOptions))
             {
@@ -138,9 +138,9 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
                     Document result = getItemTask.Result;
                     if (result != null)
                     {
-                        // TODO Optimize Document to JObject conversion. Helper method could enumerate over Document KeyPairs
+                        // TODO Optimize Document to JsonObject conversion. Helper method could enumerate over Document KeyPairs
                         // and convert DynamoDBEntry values based on type inspection
-                        return Option<JObject>.Some(JObject.Parse(result[AttributeKeyRecord].AsDocument().ToJson()));
+                        return Option<JsonObject>.Some(JsonObject.Parse(result[AttributeKeyRecord].AsDocument().ToJson()).AsObject());
                     }
                 }
                 catch (AggregateException ae)
@@ -148,7 +148,7 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
                     Logger.LogError(ae, "Metastore error");
                 }
 
-                return Option<JObject>.None;
+                return Option<JsonObject>.None;
             }
         }
 
@@ -157,8 +157,8 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
         /// </summary>
         ///
         /// <param name="keyId">The keyId to lookup.</param>
-        /// <returns>The latest <seealso cref="JObject"/> value associated with the keyId, if any.</returns>
-        public Option<JObject> LoadLatest(string keyId)
+        /// <returns>The latest <seealso cref="JsonObject"/> value associated with the keyId, if any.</returns>
+        public Option<JsonObject> LoadLatest(string keyId)
         {
             using (MetricsUtil.MetricsInstance.Measure.Timer.Time(LoadLatestTimerOptions))
             {
@@ -182,9 +182,9 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
                     {
                         Document keyRecordDocument = result.First();
 
-                        // TODO Optimize Document to JObject conversion. Helper method could enumerate over Document KeyPairs
+                        // TODO Optimize Document to JsonObject conversion. Helper method could enumerate over Document KeyPairs
                         // and convert DynamoDBEntry values based on type inspection
-                        return Option<JObject>.Some(JObject.Parse(keyRecordDocument[AttributeKeyRecord].AsDocument().ToJson()));
+                        return Option<JsonObject>.Some(JsonObject.Parse(keyRecordDocument[AttributeKeyRecord].AsDocument().ToJson()).AsObject());
                     }
                 }
                 catch (AggregateException se)
@@ -192,22 +192,22 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
                     Logger.LogError(se, "Metastore error");
                 }
 
-                return Option<JObject>.None;
+                return Option<JsonObject>.None;
             }
         }
 
         /// <summary>
-        /// Stores the <see cref="JObject"/> value using the specified keyId and created time.
+        /// Stores the <see cref="JsonObject"/> value using the specified keyId and created time.
         /// </summary>
         ///
         /// <param name="keyId">The keyId to store.</param>
         /// <param name="created">The created time to store.</param>
-        /// <param name="value">The <see cref="JObject"/> value to store.</param>
+        /// <param name="value">The <see cref="JsonObject"/> value to store.</param>
         /// <returns><value>True</value> if the store succeeded, <value>False</value> if the store failed for a known
         /// condition like duplicate key.</returns>
         /// <exception cref="AppEncryptionException">Raise an exception in case of any other metastore errors.
         /// </exception>
-        public bool Store(string keyId, DateTimeOffset created, JObject value)
+        public bool Store(string keyId, DateTimeOffset created, JsonObject value)
         {
             using (MetricsUtil.MetricsInstance.Measure.Timer.Time(StoreTimerOptions))
             {
@@ -218,7 +218,7 @@ namespace GoDaddy.Asherah.AppEncryption.Persistence
                         [PartitionKey] = keyId,
                         [SortKey] = created.ToUnixTimeSeconds(),
 
-                        // TODO Optimize JObject to Document conversion. Just need lambda that calls Document.
+                        // TODO Optimize JsonObject to Document conversion. Just need lambda that calls Document.
                         // Add and recurses for Dictionary and List types
                         [AttributeKeyRecord] = Document.FromJson(value.ToString()),
                     };

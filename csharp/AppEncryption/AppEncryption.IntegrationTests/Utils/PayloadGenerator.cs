@@ -1,6 +1,6 @@
 using System;
 using System.Text;
-using Newtonsoft.Json.Linq;
+using System.Text.Json.Nodes;
 
 namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Utils
 {
@@ -21,15 +21,15 @@ namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Utils
             return Encoding.UTF8.GetBytes(RandomStringGenerator(size, Random));
         }
 
-        public static JObject CreateDefaultRandomJsonPayload()
+        public static JsonObject CreateDefaultRandomJsonPayload()
         {
             return CreateRandomJsonPayload(DefaultByteSize);
         }
 
-        public static JObject CreateRandomJsonPayload(int size)
+        public static JsonObject CreateRandomJsonPayload(int size)
         {
             // This will end up having an extra 10 bytes from json overhead + key, meh
-            JObject json = new JObject();
+            JsonObject json = new JsonObject();
             json.Add("key", RandomStringGenerator(size, Random));
             return json;
         }
