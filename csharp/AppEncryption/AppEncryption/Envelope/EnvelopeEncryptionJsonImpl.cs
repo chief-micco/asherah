@@ -151,17 +151,14 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         {
             using (MetricsUtil.MetricsInstance.Measure.Timer.Time(EncryptTimerOptions))
             {
-                EnvelopeEncryptResult result = WithIntermediateKeyForWrite(intermediateCryptoKey => crypto.EnvelopeEncrypt(
-                        payload,
-                        intermediateCryptoKey,
-                        new KeyMeta(partition.IntermediateKeyId, intermediateCryptoKey.GetCreated())));
+                var result = WithIntermediateKeyForWrite(intermediateCryptoKey => crypto.EnvelopeEncrypt<KeyMeta>(
+                    payload,
+                    intermediateCryptoKey,
+                    new KeyMeta(partition.IntermediateKeyId, intermediateCryptoKey.GetCreated())));
 
-                KeyMeta parentKeyMeta = (KeyMeta)result.UserState;
+                var keyRecord = new EnvelopeKeyRecord(DateTimeOffset.UtcNow, result.UserState, result.EncryptedKey);
 
-                EnvelopeKeyRecord keyRecord =
-                    new EnvelopeKeyRecord(DateTimeOffset.UtcNow, parentKeyMeta, result.EncryptedKey);
-
-                Json wrapperDocument = new Json();
+                var wrapperDocument = new Json();
                 wrapperDocument.Put("Key", keyRecord.ToJson());
                 wrapperDocument.Put("Data", result.CipherText);
 
