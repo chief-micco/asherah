@@ -1,7 +1,7 @@
 using System;
 using GoDaddy.Asherah.AppEncryption.Models;
 
-namespace GoDaddy.Asherah.AppEncryption.Persistence
+namespace GoDaddy.Asherah.AppEncryption.Metastore
 {
     /// <summary>
     /// The KeyMetastore interface provides methods that can be used to load and store system and intermediate keys from a

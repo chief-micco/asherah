@@ -28,5 +28,39 @@ namespace GoDaddy.Asherah.AppEncryption.Models
         /// Gets the creation time of the key.
         /// </summary>
         public DateTimeOffset Created { get; }
+
+        /// <inheritdoc/>
+        public override bool Equals(object obj)
+        {
+            if (this == obj)
+            {
+                return true;
+            }
+
+            if (obj == null)
+            {
+                return false;
+            }
+
+            var other = obj as KeyMeta;
+            if (other == null)
+            {
+                return false;
+            }
+
+            return Id.Equals(other.Id, StringComparison.Ordinal) && Created.Equals(other.Created);
+        }
+
+        /// <inheritdoc/>
+        public override int GetHashCode()
+        {
+            return (Id, Created).GetHashCode();
+        }
+
+        /// <inheritdoc/>
+        public override string ToString()
+        {
+            return "KeyMeta [Id=" + Id + ", Created=" + Created + "]";
+        }
     }
 }

@@ -16,7 +16,7 @@ namespace GoDaddy.Asherah.AppEncryption.Models
         /// <param name="encryptedKey">The encrypted key bytes.</param>
         /// <param name="revoked">The revocation status of the encrypted key.</param>
         /// <param name="parentKeyMeta">The metadata for the parent key, if any.</param>
-        private KeyRecord(DateTimeOffset created, byte[] encryptedKey, bool revoked, KeyMeta parentKeyMeta = null)
+        private KeyRecord(DateTimeOffset created, byte[] encryptedKey, bool? revoked, KeyMeta parentKeyMeta = null)
         {
             Created = created;
             EncryptedKey = encryptedKey ?? throw new ArgumentNullException(nameof(encryptedKey));
@@ -37,7 +37,7 @@ namespace GoDaddy.Asherah.AppEncryption.Models
         /// <summary>
         /// Gets the revocation status of the encrypted key.
         /// </summary>
-        public bool Revoked { get; }
+        public bool? Revoked { get; }
 
         /// <summary>
         /// Gets the metadata for the parent key, if any.
@@ -52,7 +52,7 @@ namespace GoDaddy.Asherah.AppEncryption.Models
         /// <param name="encryptedKey">The encrypted key bytes.</param>
         /// <param name="revoked">The revocation status of the encrypted key.</param>
         /// <returns>A new system key record.</returns>
-        public static KeyRecord NewSystemKeyRecord(DateTimeOffset created, byte[] encryptedKey, bool revoked)
+        public static KeyRecord NewSystemKeyRecord(DateTimeOffset created, byte[] encryptedKey, bool? revoked)
         {
             return new KeyRecord(created, encryptedKey, revoked, null);
         }
@@ -66,7 +66,7 @@ namespace GoDaddy.Asherah.AppEncryption.Models
         /// <param name="revoked">The revocation status of the encrypted key.</param>
         /// <param name="parentKeyMeta">The metadata for the parent key.</param>
         /// <returns>A new intermediate key record.</returns>
-        public static KeyRecord NewIntermediateKeyRecord(DateTimeOffset created, byte[] encryptedKey, bool revoked, KeyMeta parentKeyMeta)
+        public static KeyRecord NewIntermediateKeyRecord(DateTimeOffset created, byte[] encryptedKey, bool? revoked, KeyMeta parentKeyMeta)
         {
             if (parentKeyMeta == null)
             {
