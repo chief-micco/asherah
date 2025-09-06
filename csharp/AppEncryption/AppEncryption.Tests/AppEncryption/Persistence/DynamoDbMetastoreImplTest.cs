@@ -7,6 +7,7 @@ using Amazon.DynamoDBv2.DocumentModel;
 using Amazon.DynamoDBv2.Model;
 using Amazon.Runtime;
 using GoDaddy.Asherah.AppEncryption.Persistence;
+using GoDaddy.Asherah.AppEncryption.Tests.Fixtures;
 using GoDaddy.Asherah.Crypto.Exceptions;
 using LanguageExt;
 using Microsoft.Extensions.Logging;
@@ -20,29 +21,14 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
 {
     public class DynamoDbMetastoreImplTest : IClassFixture<DynamoDBContainerFixture>, IClassFixture<MetricsFixture>, IDisposable
     {
-        private const string TestKey = "some_key";
         private const string DynamoDbPort = "8000";
         private const string Region = "us-west-2";
-        private const string TestKeyWithRegionSuffix = TestKey + "_" + Region;
+        private const string TestKeyWithRegionSuffix = DynamoMetastoreHelper.ExistingTestKey + "_" + Region;
 
         private readonly AmazonDynamoDBClient amazonDynamoDbClient;
 
-        private readonly Dictionary<string, object> keyRecord = new Dictionary<string, object>
-        {
-            {
-                "ParentKeyMeta", new Dictionary<string, object>
-                {
-                    { "KeyId", "_SK_api_ecomm" },
-                    { "Created", 1541461380 },
-                }
-            },
-            { "Key", "mWT/x4RvIFVFE2BEYV1IB9FMM8sWN1sK6YN5bS2UyGR+9RSZVTvp/bcQ6PycW6kxYEqrpA+aV4u04jOr" },
-            { "Created", 1541461380 },
-        };
-
-        private readonly Table table;
         private readonly DynamoDbMetastoreImpl dynamoDbMetastoreImpl;
-        private readonly DateTimeOffset created = DateTimeOffset.Now.AddDays(-1);
+        private readonly DateTimeOffset created;
         private string serviceUrl;
 
         public DynamoDbMetastoreImplTest(DynamoDBContainerFixture dynamoDbContainerFixture)
@@ -55,35 +41,14 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             };
             amazonDynamoDbClient = new AmazonDynamoDBClient(clientConfig);
 
-            CreateTableSchema(amazonDynamoDbClient, "EncryptionKey");
+            DynamoMetastoreHelper.CreateTableSchema(amazonDynamoDbClient, "EncryptionKey").Wait();
 
             dynamoDbMetastoreImpl = NewBuilder(Region)
                 .WithEndPointConfiguration(serviceUrl, Region)
                 .Build();
 
-            table = (Table)new TableBuilder(amazonDynamoDbClient, dynamoDbMetastoreImpl.TableName)
-                .AddHashKey(PartitionKey, DynamoDBEntryType.String)
-                .AddRangeKey(SortKey, DynamoDBEntryType.Numeric)
-                .Build();
-
-            JObject jObject = JObject.FromObject(keyRecord);
-            Document document = new Document
-            {
-                [PartitionKey] = TestKey,
-                [SortKey] = created.ToUnixTimeSeconds(),
-                [AttributeKeyRecord] = Document.FromJson(jObject.ToString()),
-            };
-
-            table.PutItemAsync(document).Wait();
-
-            document = new Document
-            {
-                [PartitionKey] = TestKeyWithRegionSuffix,
-                [SortKey] = created.ToUnixTimeSeconds(),
-                [AttributeKeyRecord] = Document.FromJson(jObject.ToString()),
-            };
-
-            table.PutItemAsync(document).Wait();
+            // Pre-populate test data using helper and capture the created timestamp
+            created = DynamoMetastoreHelper.PrePopulateTestDataUsingOldMetastore(amazonDynamoDbClient, "EncryptionKey", Region).Result;
         }
 
         public void Dispose()
@@ -100,34 +65,14 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             }
         }
 
-        private static void CreateTableSchema(AmazonDynamoDBClient client, string tableName)
-        {
-            CreateTableRequest request = new CreateTableRequest
-            {
-                TableName = tableName,
-                AttributeDefinitions = new List<AttributeDefinition>
-                {
-                    new AttributeDefinition(PartitionKey, ScalarAttributeType.S),
-                    new AttributeDefinition(SortKey, ScalarAttributeType.N),
-                },
-                KeySchema = new List<KeySchemaElement>
-                {
-                    new KeySchemaElement(PartitionKey, KeyType.HASH),
-                    new KeySchemaElement(SortKey, KeyType.RANGE),
-                },
-                ProvisionedThroughput = new ProvisionedThroughput(1L, 1L),
-            };
-
-            CreateTableResponse createTableResponse = client.CreateTableAsync(request).Result;
-        }
 
         [Fact]
         public void TestLoadSuccess()
         {
-            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.Load(TestKey, created);
+            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.Load(DynamoMetastoreHelper.ExistingTestKey, created);
 
             Assert.True(actualJsonObject.IsSome);
-            Assert.True(JToken.DeepEquals(JObject.FromObject(keyRecord), (JObject)actualJsonObject));
+            Assert.True(JToken.DeepEquals(JObject.FromObject(DynamoMetastoreHelper.ExistingKeyRecord), (JObject)actualJsonObject));
         }
 
         [Fact]
@@ -142,7 +87,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
         public void TestLoadWithFailureShouldReturnEmpty()
         {
             Dispose();
-            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.Load(TestKey, created);
+            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.Load(DynamoMetastoreHelper.ExistingTestKey, created);
 
             Assert.False(actualJsonObject.IsSome);
         }
@@ -150,10 +95,10 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
         [Fact]
         public void TestLoadLatestWithSingleRecord()
         {
-            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.LoadLatest(TestKey);
+            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.LoadLatest(DynamoMetastoreHelper.ExistingTestKey);
 
             Assert.True(actualJsonObject.IsSome);
-            Assert.True(JToken.DeepEquals(JObject.FromObject(keyRecord), (JObject)actualJsonObject));
+            Assert.True(JToken.DeepEquals(JObject.FromObject(DynamoMetastoreHelper.ExistingKeyRecord), (JObject)actualJsonObject));
         }
 
         [Fact]
@@ -164,15 +109,21 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
                 .WithKeySuffix()
                 .Build();
 
-            Option<JObject> actualJsonObject = dbMetastoreImpl.LoadLatest(TestKey);
+            Option<JObject> actualJsonObject = dbMetastoreImpl.LoadLatest(DynamoMetastoreHelper.ExistingTestKey);
 
             Assert.True(actualJsonObject.IsSome);
-            Assert.True(JToken.DeepEquals(JObject.FromObject(keyRecord), (JObject)actualJsonObject));
+            Assert.True(JToken.DeepEquals(JObject.FromObject(DynamoMetastoreHelper.ExistingKeyRecord), (JObject)actualJsonObject));
         }
 
         [Fact]
         public async Task TestLoadLatestWithMultipleRecords()
         {
+            // Create a local table instance for this test
+            Table table = (Table)new TableBuilder(amazonDynamoDbClient, dynamoDbMetastoreImpl.TableName)
+                .AddHashKey(PartitionKey, DynamoDBEntryType.String)
+                .AddRangeKey(SortKey, DynamoDBEntryType.Numeric)
+                .Build();
+
             DateTimeOffset createdMinusOneHour = created.AddHours(-1);
             DateTimeOffset createdPlusOneHour = created.AddHours(1);
             DateTimeOffset createdMinusOneDay = created.AddDays(-1);
@@ -181,7 +132,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             // intentionally mixing up insertion order
             Document documentPlusOneHour = new Document
             {
-                [PartitionKey] = TestKey,
+                [PartitionKey] = DynamoMetastoreHelper.ExistingTestKey,
                 [SortKey] = createdPlusOneHour.ToUnixTimeSeconds(),
                 [AttributeKeyRecord] = Document.FromJson(new JObject
                 {
@@ -192,7 +143,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
 
             Document documentPlusOneDay = new Document
             {
-                [PartitionKey] = TestKey,
+                [PartitionKey] = DynamoMetastoreHelper.ExistingTestKey,
                 [SortKey] = createdPlusOneDay.ToUnixTimeSeconds(),
                 [AttributeKeyRecord] = Document.FromJson(new JObject
                 {
@@ -203,7 +154,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
 
             Document documentMinusOneHour = new Document
             {
-                [PartitionKey] = TestKey,
+                [PartitionKey] = DynamoMetastoreHelper.ExistingTestKey,
                 [SortKey] = createdMinusOneHour.ToUnixTimeSeconds(),
                 [AttributeKeyRecord] = Document.FromJson(new JObject
                 {
@@ -214,7 +165,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
 
             Document documentMinusOneDay = new Document
             {
-                [PartitionKey] = TestKey,
+                [PartitionKey] = DynamoMetastoreHelper.ExistingTestKey,
                 [SortKey] = createdMinusOneDay.ToUnixTimeSeconds(),
                 [AttributeKeyRecord] = Document.FromJson(new JObject
                 {
@@ -223,7 +174,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             };
             await table.PutItemAsync(documentMinusOneDay, CancellationToken.None);
 
-            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.LoadLatest(TestKey);
+            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.LoadLatest(DynamoMetastoreHelper.ExistingTestKey);
 
             Assert.True(actualJsonObject.IsSome);
             Assert.True(JToken.DeepEquals(createdPlusOneDay, ((JObject)actualJsonObject).GetValue("mytime")));
@@ -241,7 +192,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
         public void TestLoadLatestWithFailureShouldReturnEmpty()
         {
             Dispose();
-            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.LoadLatest(TestKey);
+            Option<JObject> actualJsonObject = dynamoDbMetastoreImpl.LoadLatest(DynamoMetastoreHelper.ExistingTestKey);
 
             Assert.False(actualJsonObject.IsSome);
         }
@@ -249,7 +200,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
         [Fact]
         public void TestStore()
         {
-            bool actualValue = dynamoDbMetastoreImpl.Store(TestKey, DateTimeOffset.Now, JObject.FromObject(keyRecord));
+            bool actualValue = dynamoDbMetastoreImpl.Store(DynamoMetastoreHelper.ExistingTestKey, DateTimeOffset.Now, JObject.FromObject(DynamoMetastoreHelper.ExistingKeyRecord));
 
             Assert.True(actualValue);
         }
@@ -261,7 +212,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
                 .WithEndPointConfiguration(serviceUrl, Region)
                 .WithKeySuffix()
                 .Build();
-            bool actualValue = dbMetastoreImpl.Store(TestKey, DateTimeOffset.Now, JObject.FromObject(keyRecord));
+            bool actualValue = dbMetastoreImpl.Store(DynamoMetastoreHelper.ExistingTestKey, DateTimeOffset.Now, JObject.FromObject(DynamoMetastoreHelper.ExistingKeyRecord));
 
             Assert.True(actualValue);
         }
@@ -278,7 +229,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
             var dbMetastoreImpl = NewBuilder(Region)
                 .WithDynamoDbClient(client)
                 .Build();
-            bool actualValue = dbMetastoreImpl.Store(TestKey, DateTimeOffset.Now, JObject.FromObject(keyRecord));
+            bool actualValue = dbMetastoreImpl.Store(DynamoMetastoreHelper.ExistingTestKey, DateTimeOffset.Now, JObject.FromObject(DynamoMetastoreHelper.ExistingKeyRecord));
 
             Assert.True(actualValue);
         }
@@ -288,15 +239,15 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
         {
             Dispose();
             Assert.Throws<AppEncryptionException>(() =>
-                dynamoDbMetastoreImpl.Store(TestKey, DateTimeOffset.Now, JObject.FromObject(keyRecord)));
+                dynamoDbMetastoreImpl.Store(DynamoMetastoreHelper.ExistingTestKey, DateTimeOffset.Now, JObject.FromObject(DynamoMetastoreHelper.ExistingKeyRecord)));
         }
 
         [Fact]
         public void TestStoreWithDuplicateShouldReturnFalse()
         {
             DateTimeOffset now = DateTimeOffset.Now;
-            bool firstAttempt = dynamoDbMetastoreImpl.Store(TestKey, now, JObject.FromObject(keyRecord));
-            bool secondAttempt = dynamoDbMetastoreImpl.Store(TestKey, now, JObject.FromObject(keyRecord));
+            bool firstAttempt = dynamoDbMetastoreImpl.Store(DynamoMetastoreHelper.ExistingTestKey, now, JObject.FromObject(DynamoMetastoreHelper.ExistingKeyRecord));
+            bool secondAttempt = dynamoDbMetastoreImpl.Store(DynamoMetastoreHelper.ExistingTestKey, now, JObject.FromObject(DynamoMetastoreHelper.ExistingKeyRecord));
 
             Assert.True(firstAttempt);
             Assert.False(secondAttempt);
@@ -387,17 +338,17 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
                 AuthenticationRegion = "us-west-2",
             };
             AmazonDynamoDBClient tempDynamoDbClient = new AmazonDynamoDBClient(amazonDynamoDbConfig);
-            CreateTableSchema(tempDynamoDbClient, tempTableName);
+            await DynamoMetastoreHelper.CreateTableSchema(tempDynamoDbClient, tempTableName);
 
             // Put the object in temp table
             Table tempTable = (Table)new TableBuilder(tempDynamoDbClient, tempTableName)
                 .AddHashKey(PartitionKey, DynamoDBEntryType.String)
                 .AddRangeKey(SortKey, DynamoDBEntryType.Numeric)
                 .Build();
-            JObject jObject = JObject.FromObject(keyRecord);
+            JObject jObject = JObject.FromObject(DynamoMetastoreHelper.ExistingKeyRecord);
             Document document = new Document
             {
-                [PartitionKey] = TestKey,
+                [PartitionKey] = DynamoMetastoreHelper.ExistingTestKey,
                 [SortKey] = created.ToUnixTimeSeconds(),
                 [AttributeKeyRecord] = Document.FromJson(jObject.ToString()),
             };
@@ -408,11 +359,11 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence
                 .WithEndPointConfiguration(serviceUrl, "us-west-2")
                 .WithTableName(tempTableName)
                 .Build();
-            Option<JObject> actualJsonObject = dbMetastoreImpl.Load(TestKey, created);
+            Option<JObject> actualJsonObject = dbMetastoreImpl.Load(DynamoMetastoreHelper.ExistingTestKey, created);
 
             // Verify that we were able to load and successfully decrypt the item from the metastore object created withTableName
             Assert.True(actualJsonObject.IsSome);
-            Assert.True(JToken.DeepEquals(JObject.FromObject(keyRecord), (JObject)actualJsonObject));
+            Assert.True(JToken.DeepEquals(JObject.FromObject(DynamoMetastoreHelper.ExistingKeyRecord), (JObject)actualJsonObject));
         }
 
         [Fact]

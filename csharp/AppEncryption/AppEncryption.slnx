@@ -2,5 +2,6 @@
   <Project Path="AppEncryption.IntegrationTests/AppEncryption.IntegrationTests.csproj" />
   <Project Path="AppEncryption.Tests/AppEncryption.Tests.csproj" />
   <Project Path="AppEncryption/AppEncryption.csproj" />
+  <Project Path="Extensions.Aws/Extensions.Aws.csproj" />
   <Project Path="Crypto/Crypto.csproj" />
 </Solution>

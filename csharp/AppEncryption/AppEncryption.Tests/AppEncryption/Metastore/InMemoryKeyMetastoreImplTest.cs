@@ -1,5 +1,5 @@
 using System;
-using GoDaddy.Asherah.AppEncryption.Models;
+using System.Threading.Tasks;
 using GoDaddy.Asherah.AppEncryption.Metastore;
 using Xunit;
 
@@ -15,101 +15,101 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Metastore
         }
 
         [Fact]
-        private void TestTryLoadAndStoreWithValidKey()
+        private async Task TestTryLoadAndStoreWithValidKey()
         {
             const string keyId = "ThisIsMyKey";
             DateTimeOffset created = DateTimeOffset.UtcNow;
-            var keyRecord = KeyRecord.NewSystemKeyRecord(created, new byte[] { 1, 2, 3 }, false);
+            var keyRecord = new KeyRecord(created, "test-key-data", false);
 
-            inMemoryKeyMetastoreImpl.Store(keyId, created, keyRecord);
+            await inMemoryKeyMetastoreImpl.StoreAsync(keyId, created, keyRecord);
 
-            bool success = inMemoryKeyMetastoreImpl.TryLoad(keyId, created, out KeyRecord actualKeyRecord);
+            var (success, actualKeyRecord) = await inMemoryKeyMetastoreImpl.TryLoadAsync(keyId, created);
 
             Assert.True(success);
             Assert.Equal(keyRecord, actualKeyRecord);
         }
 
         [Fact]
-        private void TestTryLoadAndStoreWithInvalidKey()
+        private async Task TestTryLoadAndStoreWithInvalidKey()
         {
             const string keyId = "ThisIsMyKey";
             DateTimeOffset created = DateTimeOffset.UtcNow;
-            var keyRecord = KeyRecord.NewSystemKeyRecord(created, new byte[] { 1, 2, 3 }, false);
+            var keyRecord = new KeyRecord(created, "test-key-data", false);
 
-            inMemoryKeyMetastoreImpl.Store(keyId, created, keyRecord);
+            await inMemoryKeyMetastoreImpl.StoreAsync(keyId, created, keyRecord);
 
-            bool success = inMemoryKeyMetastoreImpl.TryLoad("some non-existent key", created, out KeyRecord actualKeyRecord);
+            var (success, actualKeyRecord) = await inMemoryKeyMetastoreImpl.TryLoadAsync("some non-existent key", created);
 
             Assert.False(success);
             Assert.Null(actualKeyRecord);
         }
 
         [Fact]
-        private void TestTryLoadLatestMultipleCreatedAndValuesForKeyIdShouldReturnLatest()
+        private async Task TestTryLoadLatestMultipleCreatedAndValuesForKeyIdShouldReturnLatest()
         {
             const string keyId = "ThisIsMyKey";
             DateTimeOffset created = DateTimeOffset.UtcNow;
-            var keyRecord = KeyRecord.NewSystemKeyRecord(created, new byte[] { 1, 2, 3 }, false);
+            var keyRecord = new KeyRecord(created, "test-key-data", false);
 
-            inMemoryKeyMetastoreImpl.Store(keyId, created, keyRecord);
+            await inMemoryKeyMetastoreImpl.StoreAsync(keyId, created, keyRecord);
 
             DateTimeOffset createdOneHourLater = created.AddHours(1);
-            var keyRecordOneHourLater = KeyRecord.NewSystemKeyRecord(createdOneHourLater, new byte[] { 4, 5, 6 }, false);
-            inMemoryKeyMetastoreImpl.Store(keyId, createdOneHourLater, keyRecordOneHourLater);
+            var keyRecordOneHourLater = new KeyRecord(createdOneHourLater, "test-key-data-hour", false);
+            await inMemoryKeyMetastoreImpl.StoreAsync(keyId, createdOneHourLater, keyRecordOneHourLater);
 
             DateTimeOffset createdOneDayLater = created.AddDays(1);
-            var keyRecordOneDayLater = KeyRecord.NewSystemKeyRecord(createdOneDayLater, new byte[] { 7, 8, 9 }, false);
-            inMemoryKeyMetastoreImpl.Store(keyId, createdOneDayLater, keyRecordOneDayLater);
+            var keyRecordOneDayLater = new KeyRecord(createdOneDayLater, "test-key-data-day", false);
+            await inMemoryKeyMetastoreImpl.StoreAsync(keyId, createdOneDayLater, keyRecordOneDayLater);
 
             DateTimeOffset createdOneWeekEarlier = created.AddDays(-7);
-            var keyRecordOneWeekEarlier = KeyRecord.NewSystemKeyRecord(createdOneWeekEarlier, new byte[] { 10, 11, 12 }, false);
-            inMemoryKeyMetastoreImpl.Store(keyId, createdOneWeekEarlier, keyRecordOneWeekEarlier);
+            var keyRecordOneWeekEarlier = new KeyRecord(createdOneWeekEarlier, "test-key-data-week", false);
+            await inMemoryKeyMetastoreImpl.StoreAsync(keyId, createdOneWeekEarlier, keyRecordOneWeekEarlier);
 
-            bool success = inMemoryKeyMetastoreImpl.TryLoadLatest(keyId, out KeyRecord actualKeyRecord);
+            var (success, actualKeyRecord) = await inMemoryKeyMetastoreImpl.TryLoadLatestAsync(keyId);
 
             Assert.True(success);
             Assert.Equal(keyRecordOneDayLater, actualKeyRecord);
         }
 
         [Fact]
-        private void TestTryLoadLatestNonExistentKeyIdShouldReturnFalse()
+        private async Task TestTryLoadLatestNonExistentKeyIdShouldReturnFalse()
         {
             const string keyId = "ThisIsMyKey";
             DateTimeOffset created = DateTimeOffset.UtcNow;
-            var keyRecord = KeyRecord.NewSystemKeyRecord(created, new byte[] { 1, 2, 3 }, false);
+            var keyRecord = new KeyRecord(created, "test-key-data", false);
 
-            inMemoryKeyMetastoreImpl.Store(keyId, created, keyRecord);
+            await inMemoryKeyMetastoreImpl.StoreAsync(keyId, created, keyRecord);
 
-            bool success = inMemoryKeyMetastoreImpl.TryLoadLatest("some non-existent key", out KeyRecord actualKeyRecord);
+            var (success, actualKeyRecord) = await inMemoryKeyMetastoreImpl.TryLoadLatestAsync("some non-existent key");
 
             Assert.False(success);
             Assert.Null(actualKeyRecord);
         }
 
         [Fact]
-        private void TestStoreWithDuplicateKeyShouldReturnFalse()
+        private async Task TestStoreWithDuplicateKeyShouldReturnFalse()
         {
             const string keyId = "ThisIsMyKey";
             DateTimeOffset created = DateTimeOffset.UtcNow;
-            var keyRecord = KeyRecord.NewSystemKeyRecord(created, new byte[] { 1, 2, 3 }, false);
+            var keyRecord = new KeyRecord(created, "test-key-data", false);
 
-            Assert.True(inMemoryKeyMetastoreImpl.Store(keyId, created, keyRecord));
-            Assert.False(inMemoryKeyMetastoreImpl.Store(keyId, created, keyRecord));
+            Assert.True(await inMemoryKeyMetastoreImpl.StoreAsync(keyId, created, keyRecord));
+            Assert.False(await inMemoryKeyMetastoreImpl.StoreAsync(keyId, created, keyRecord));
         }
 
         [Fact]
-        private void TestStoreWithIntermediateKeyRecord()
+        private async Task TestStoreWithIntermediateKeyRecord()
         {
             const string keyId = "ThisIsMyKey";
             DateTimeOffset created = DateTimeOffset.UtcNow;
             var parentKeyMeta = new KeyMeta("parentKey", created.AddDays(-1));
-            var keyRecord = KeyRecord.NewIntermediateKeyRecord(created, new byte[] { 1, 2, 3 }, false, parentKeyMeta);
+            var keyRecord = new KeyRecord(created, "test-key-data-parent", false, parentKeyMeta);
 
-            bool success = inMemoryKeyMetastoreImpl.Store(keyId, created, keyRecord);
+            bool success = await inMemoryKeyMetastoreImpl.StoreAsync(keyId, created, keyRecord);
 
             Assert.True(success);
 
-            bool loadSuccess = inMemoryKeyMetastoreImpl.TryLoad(keyId, created, out KeyRecord actualKeyRecord);
+            var (loadSuccess, actualKeyRecord) = await inMemoryKeyMetastoreImpl.TryLoadAsync(keyId, created);
             Assert.True(loadSuccess);
             Assert.Equal(keyRecord, actualKeyRecord);
         }

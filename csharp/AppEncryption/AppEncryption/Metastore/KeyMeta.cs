@@ -1,6 +1,6 @@
 using System;
 
-namespace GoDaddy.Asherah.AppEncryption.Models
+namespace GoDaddy.Asherah.AppEncryption.Metastore
 {
     /// <summary>
     /// Represents metadata for a parent key.

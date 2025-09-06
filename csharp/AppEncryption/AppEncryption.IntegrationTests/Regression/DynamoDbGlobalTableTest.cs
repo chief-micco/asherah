@@ -5,7 +5,7 @@ using Amazon.DynamoDBv2.Model;
 using GoDaddy.Asherah.AppEncryption.IntegrationTests.Utils;
 using GoDaddy.Asherah.AppEncryption.Persistence;
 using GoDaddy.Asherah.AppEncryption.Tests;
-using GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Persistence;
+using GoDaddy.Asherah.AppEncryption.Tests.Fixtures;
 using Xunit;
 
 namespace GoDaddy.Asherah.AppEncryption.IntegrationTests.Regression

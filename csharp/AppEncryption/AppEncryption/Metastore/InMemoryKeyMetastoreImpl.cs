@@ -3,9 +3,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using GoDaddy.Asherah.AppEncryption.Models;
-
-[assembly: InternalsVisibleTo("AppEncryption.Tests")]
+using System.Threading.Tasks;
 
 namespace GoDaddy.Asherah.AppEncryption.Metastore
 {
@@ -37,7 +35,7 @@ namespace GoDaddy.Asherah.AppEncryption.Metastore
         }
 
         /// <inheritdoc />
-        public bool TryLoad(string keyId, DateTimeOffset created, out KeyRecord keyRecord)
+        public Task<(bool found, KeyRecord keyRecord)> TryLoadAsync(string keyId, DateTimeOffset created)
         {
             lock (dataTable)
             {
@@ -47,17 +45,16 @@ namespace GoDaddy.Asherah.AppEncryption.Metastore
                     .ToList();
                 if (dataRows.Count == 0)
                 {
-                    keyRecord = null;
-                    return false;
+                    return Task.FromResult((false, (KeyRecord)null));
                 }
 
-                keyRecord = (KeyRecord)dataRows.Single()["keyRecord"];
-                return true;
+                var keyRecord = (KeyRecord)dataRows.Single()["keyRecord"];
+                return Task.FromResult((true, keyRecord));
             }
         }
 
         /// <inheritdoc />
-        public bool TryLoadLatest(string keyId, out KeyRecord keyRecord)
+        public Task<(bool found, KeyRecord keyRecord)> TryLoadLatestAsync(string keyId)
         {
             lock (dataTable)
             {
@@ -69,17 +66,16 @@ namespace GoDaddy.Asherah.AppEncryption.Metastore
                 // Need to check if empty as Last will throw an exception instead of returning null
                 if (dataRows.Count == 0)
                 {
-                    keyRecord = null;
-                    return false;
+                    return Task.FromResult((false, (KeyRecord)null));
                 }
 
-                keyRecord = (KeyRecord)dataRows.Last()["keyRecord"];
-                return true;
+                var keyRecord = (KeyRecord)dataRows.Last()["keyRecord"];
+                return Task.FromResult((true, keyRecord));
             }
         }
 
         /// <inheritdoc />
-        public bool Store(string keyId, DateTimeOffset created, KeyRecord keyRecord)
+        public Task<bool> StoreAsync(string keyId, DateTimeOffset created, KeyRecord keyRecord)
         {
             lock (dataTable)
             {
@@ -89,11 +85,11 @@ namespace GoDaddy.Asherah.AppEncryption.Metastore
                     .ToList();
                 if (dataRows.Count > 0)
                 {
-                    return false;
+                    return Task.FromResult(false);
                 }
 
                 dataTable.Rows.Add(keyId, created, keyRecord);
-                return true;
+                return Task.FromResult(true);
             }
         }
 
