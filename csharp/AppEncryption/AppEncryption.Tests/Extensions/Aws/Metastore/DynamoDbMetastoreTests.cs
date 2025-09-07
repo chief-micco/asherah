@@ -36,7 +36,10 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDbContainerFixture>, I
 
         DynamoDbMetastoreHelper.CreateTableSchema(_amazonDynamoDbClient, TestTableName).Wait();
 
-        _options = new DynamoDbMetastoreOptions(TestTableName);
+        _options = new DynamoDbMetastoreOptions
+        {
+            KeyRecordTableName = TestTableName
+        };
         _dynamoDbMetastore = new DynamoDbMetastore(_amazonDynamoDbClient, _options);
 
         // Pre-populate test data using helper and capture the created timestamp
@@ -55,7 +58,7 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDbContainerFixture>, I
         }
     }
 
-    private static void VerifyKeyRecordMatchesExpected(KeyRecord loadedKeyRecord)
+    private static void VerifyKeyRecordMatchesExpected(IKeyRecord loadedKeyRecord)
     {
         // Test Key property
         Assert.Equal((string)DynamoDbMetastoreHelper.ExistingKeyRecord["Key"], loadedKeyRecord.Key);
@@ -69,7 +72,7 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDbContainerFixture>, I
         // Test ParentKeyMeta property
         Assert.NotNull(loadedKeyRecord.ParentKeyMeta);
         var expectedParentKeyMeta = (Dictionary<string, object>)DynamoDbMetastoreHelper.ExistingKeyRecord["ParentKeyMeta"];
-        Assert.Equal((string)expectedParentKeyMeta["KeyId"], loadedKeyRecord.ParentKeyMeta.Id);
+        Assert.Equal((string)expectedParentKeyMeta["KeyId"], loadedKeyRecord.ParentKeyMeta.KeyId);
         Assert.Equal(DateTimeOffset.FromUnixTimeSeconds((int)expectedParentKeyMeta["Created"]), loadedKeyRecord.ParentKeyMeta.Created);
     }
 
@@ -208,7 +211,7 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDbContainerFixture>, I
         // Arrange
         var testKeyId = "test_store_key";
         var testCreated = DateTimeOffset.Now;
-        var parentKeyMeta = hasParentKeyMeta ? new KeyMeta("parent_key_id", DateTimeOffset.Now.AddDays(-1)) : null;
+        var parentKeyMeta = hasParentKeyMeta ? new KeyMeta { KeyId = "parent_key_id", Created = DateTimeOffset.Now.AddDays(-1) } : null;
 
         var testKeyRecord = new KeyRecord(
             testCreated,
@@ -234,7 +237,7 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDbContainerFixture>, I
         if (hasParentKeyMeta)
         {
             Assert.NotNull(loadedKeyRecord.ParentKeyMeta);
-            Assert.Equal(testKeyRecord.ParentKeyMeta.Id, loadedKeyRecord.ParentKeyMeta.Id);
+            Assert.Equal(testKeyRecord.ParentKeyMeta.KeyId, loadedKeyRecord.ParentKeyMeta.KeyId);
             Assert.Equal(testKeyRecord.ParentKeyMeta.Created.ToUnixTimeSeconds(), loadedKeyRecord.ParentKeyMeta.Created.ToUnixTimeSeconds());
         }
         else

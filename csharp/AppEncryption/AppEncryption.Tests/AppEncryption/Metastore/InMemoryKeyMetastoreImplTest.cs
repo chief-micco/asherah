@@ -102,7 +102,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Metastore
         {
             const string keyId = "ThisIsMyKey";
             DateTimeOffset created = DateTimeOffset.UtcNow;
-            var parentKeyMeta = new KeyMeta("parentKey", created.AddDays(-1));
+            var parentKeyMeta = new KeyMeta { KeyId = "parentKey", Created = created.AddDays(-1) };
             var keyRecord = new KeyRecord(created, "test-key-data-parent", false, parentKeyMeta);
 
             bool success = await inMemoryKeyMetastoreImpl.StoreAsync(keyId, created, keyRecord);

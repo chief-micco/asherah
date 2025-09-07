@@ -1,33 +1,24 @@
 using System;
+using System.Text.Json.Serialization;
+using GoDaddy.Asherah.AppEncryption.Serialization;
 
 namespace GoDaddy.Asherah.AppEncryption.Metastore
 {
     /// <summary>
     /// Represents metadata for a parent key.
     /// </summary>
-    public class KeyMeta
+    public class KeyMeta : IKeyMeta
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="KeyMeta"/> class.
+        /// Gets or sets the key identifier.
         /// </summary>
-        ///
-        /// <param name="id">The key identifier.</param>
-        /// <param name="created">The creation time of the key.</param>
-        public KeyMeta(string id, DateTimeOffset created)
-        {
-            Id = id ?? throw new ArgumentNullException(nameof(id));
-            Created = created;
-        }
+        public string KeyId { get; set; }
 
         /// <summary>
-        /// Gets the key identifier.
+        /// Gets or sets the creation time of the key.
         /// </summary>
-        public string Id { get; }
-
-        /// <summary>
-        /// Gets the creation time of the key.
-        /// </summary>
-        public DateTimeOffset Created { get; }
+        [JsonConverter(typeof(UnixTimestampDateTimeOffsetConverter))]
+        public DateTimeOffset Created { get; set; }
 
         /// <inheritdoc/>
         public override bool Equals(object obj)
@@ -48,19 +39,19 @@ namespace GoDaddy.Asherah.AppEncryption.Metastore
                 return false;
             }
 
-            return Id.Equals(other.Id, StringComparison.Ordinal) && Created.Equals(other.Created);
+            return KeyId.Equals(other.KeyId, StringComparison.Ordinal) && Created.Equals(other.Created);
         }
 
         /// <inheritdoc/>
         public override int GetHashCode()
         {
-            return (Id, Created).GetHashCode();
+            return (KeyId, Created).GetHashCode();
         }
 
         /// <inheritdoc/>
         public override string ToString()
         {
-            return "KeyMeta [Id=" + Id + ", Created=" + Created + "]";
+            return "KeyMeta [KeyId=" + KeyId + ", Created=" + Created + "]";
         }
     }
 }

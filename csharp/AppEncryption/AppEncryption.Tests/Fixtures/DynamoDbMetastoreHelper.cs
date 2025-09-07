@@ -121,7 +121,7 @@ public static class DynamoDbMetastoreHelper
         {
             keyRecordDict["ParentKeyMeta"] = new Dictionary<string, object>
             {
-                { "KeyId", keyRecord.ParentKeyMeta.Id },
+                { "KeyId", keyRecord.ParentKeyMeta.KeyId },
                 { "Created", keyRecord.ParentKeyMeta.Created.ToUnixTimeSeconds() }
             };
         }
@@ -168,7 +168,7 @@ public static class DynamoDbMetastoreHelper
         {
             Assert.True(loadedKeyRecord.ContainsKey("ParentKeyMeta"));
             var parentKeyMeta = loadedKeyRecord["ParentKeyMeta"]!.ToObject<JObject>();
-            Assert.Equal(expectedKeyRecord.ParentKeyMeta.Id, parentKeyMeta["KeyId"]!.ToString());
+            Assert.Equal(expectedKeyRecord.ParentKeyMeta.KeyId, parentKeyMeta["KeyId"]!.ToString());
             Assert.Equal(expectedKeyRecord.ParentKeyMeta.Created.ToUnixTimeSeconds(), parentKeyMeta["Created"]!.ToObject<long>());
         }
         else

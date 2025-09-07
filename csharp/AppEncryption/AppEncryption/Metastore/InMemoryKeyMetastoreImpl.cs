@@ -34,7 +34,7 @@ namespace GoDaddy.Asherah.AppEncryption.Metastore
         }
 
         /// <inheritdoc />
-        public Task<(bool found, KeyRecord keyRecord)> TryLoadAsync(string keyId, DateTimeOffset created)
+        public Task<(bool found, IKeyRecord keyRecord)> TryLoadAsync(string keyId, DateTimeOffset created)
         {
             lock (dataTable)
             {
@@ -44,16 +44,16 @@ namespace GoDaddy.Asherah.AppEncryption.Metastore
                     .ToList();
                 if (dataRows.Count == 0)
                 {
-                    return Task.FromResult((false, (KeyRecord)null));
+                    return Task.FromResult((false, (IKeyRecord)null));
                 }
 
-                var keyRecord = (KeyRecord)dataRows.Single()["keyRecord"];
+                var keyRecord = (IKeyRecord)dataRows.Single()["keyRecord"];
                 return Task.FromResult((true, keyRecord));
             }
         }
 
         /// <inheritdoc />
-        public Task<(bool found, KeyRecord keyRecord)> TryLoadLatestAsync(string keyId)
+        public Task<(bool found, IKeyRecord keyRecord)> TryLoadLatestAsync(string keyId)
         {
             lock (dataTable)
             {
@@ -65,16 +65,16 @@ namespace GoDaddy.Asherah.AppEncryption.Metastore
                 // Need to check if empty as Last will throw an exception instead of returning null
                 if (dataRows.Count == 0)
                 {
-                    return Task.FromResult((false, (KeyRecord)null));
+                    return Task.FromResult((false, (IKeyRecord)null));
                 }
 
-                var keyRecord = (KeyRecord)dataRows.Last()["keyRecord"];
+                var keyRecord = (IKeyRecord)dataRows.Last()["keyRecord"];
                 return Task.FromResult((true, keyRecord));
             }
         }
 
         /// <inheritdoc />
-        public Task<bool> StoreAsync(string keyId, DateTimeOffset created, KeyRecord keyRecord)
+        public Task<bool> StoreAsync(string keyId, DateTimeOffset created, IKeyRecord keyRecord)
         {
             lock (dataTable)
             {
