@@ -18,7 +18,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.Fixtures;
 public static class DynamoDbMetastoreHelper
 {
     public const string ExistingTestKey = "some_key";
-    public static readonly Dictionary<string, object> ExistingKeyRecord = new Dictionary<string, object>
+    public static readonly Dictionary<string, object> ExistingKeyRecord = new()
     {
         {
             "ParentKeyMeta", new Dictionary<string, object>
@@ -27,7 +27,7 @@ public static class DynamoDbMetastoreHelper
                 { "Created", 1541461380 },
             }
         },
-        { "Key", "mWT/x4RvIFVFE2BEYV1IB9FMM8sWN1sK6YN5bS2UyGR+9RSZVTvp/bcQ6PycW6kxYEqrpA+aV4u04jOr" },
+        { "Key", "fake-key-data" },
         { "Created", 1541461380 },
     };
 
