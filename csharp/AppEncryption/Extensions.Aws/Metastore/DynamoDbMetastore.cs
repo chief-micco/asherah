@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using GoDaddy.Asherah.AppEncryption.Metastore;
-using GoDaddy.Asherah.Crypto.Exceptions;
 
 namespace GoDaddy.Asherah.AppEncryption.Extensions.Aws.Metastore;
 
@@ -17,9 +16,9 @@ namespace GoDaddy.Asherah.AppEncryption.Extensions.Aws.Metastore;
 /// <param name="options">Configuration options for the metastore.</param>
 public class DynamoDbMetastore(IAmazonDynamoDB dynamoDbClient, DynamoDbMetastoreOptions options) : IKeyMetastore
 {
-    internal const string PartitionKey = "Id";
-    internal const string SortKey = "Created";
-    internal const string AttributeKeyRecord = "KeyRecord";
+    private const string PartitionKey = "Id";
+    private const string SortKey = "Created";
+    private const string AttributeKeyRecord = "KeyRecord";
 
     /// <inheritdoc />
     public async Task<(bool found, KeyRecord keyRecord)> TryLoadAsync(string keyId, DateTimeOffset created)
@@ -29,8 +28,8 @@ public class DynamoDbMetastore(IAmazonDynamoDB dynamoDbClient, DynamoDbMetastore
             TableName = options.KeyRecordTableName,
             Key = new Dictionary<string, AttributeValue>
             {
-                [PartitionKey] = new AttributeValue { S = keyId },
-                [SortKey] = new AttributeValue { N = created.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture) }
+                [PartitionKey] = new() { S = keyId },
+                [SortKey] = new() { N = created.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture) }
             },
             ProjectionExpression = AttributeKeyRecord,
             ConsistentRead = true
@@ -56,7 +55,7 @@ public class DynamoDbMetastore(IAmazonDynamoDB dynamoDbClient, DynamoDbMetastore
             KeyConditionExpression = $"{PartitionKey} = :keyId",
             ExpressionAttributeValues = new Dictionary<string, AttributeValue>
             {
-                [":keyId"] = new AttributeValue { S = keyId }
+                [":keyId"] = new() { S = keyId }
             },
             ProjectionExpression = AttributeKeyRecord,
             ScanIndexForward = false, // Sort descending (latest first)
@@ -66,17 +65,19 @@ public class DynamoDbMetastore(IAmazonDynamoDB dynamoDbClient, DynamoDbMetastore
 
         var response = await dynamoDbClient.QueryAsync(request);
 
-        if (response.Items != null && response.Items.Count > 0)
+        if (response.Items is not { Count: > 0 })
         {
-            var item = response.Items[0];
-            if (item.TryGetValue(AttributeKeyRecord, out var keyRecordAttribute))
-            {
-                var keyRecord = ConvertAttributeValueToKeyRecord(keyRecordAttribute);
-                return (true, keyRecord);
-            }
+            return (false, null);
         }
 
-        return (false, null);
+        var item = response.Items[0];
+        if (!item.TryGetValue(AttributeKeyRecord, out var keyRecordAttribute))
+        {
+            return (false, null);
+        }
+
+        var keyRecord = ConvertAttributeValueToKeyRecord(keyRecordAttribute);
+        return (true, keyRecord);
     }
 
     /// <inheritdoc />
@@ -86,8 +87,8 @@ public class DynamoDbMetastore(IAmazonDynamoDB dynamoDbClient, DynamoDbMetastore
         {
             var keyRecordMap = new Dictionary<string, AttributeValue>
             {
-                ["Key"] = new AttributeValue { S = keyRecord.Key },
-                ["Created"] = new AttributeValue { N = keyRecord.Created.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture) }
+                ["Key"] = new() { S = keyRecord.Key },
+                ["Created"] = new() { N = keyRecord.Created.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture) }
             };
 
             // Only add Revoked if it has a value
@@ -103,8 +104,8 @@ public class DynamoDbMetastore(IAmazonDynamoDB dynamoDbClient, DynamoDbMetastore
                 {
                     M = new Dictionary<string, AttributeValue>
                     {
-                        ["KeyId"] = new AttributeValue { S = keyRecord.ParentKeyMeta.Id },
-                        ["Created"] = new AttributeValue { N = keyRecord.ParentKeyMeta.Created.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture) }
+                        ["KeyId"] = new() { S = keyRecord.ParentKeyMeta.Id },
+                        ["Created"] = new() { N = keyRecord.ParentKeyMeta.Created.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture) }
                     }
                 };
             }
@@ -113,8 +114,8 @@ public class DynamoDbMetastore(IAmazonDynamoDB dynamoDbClient, DynamoDbMetastore
 
             var item = new Dictionary<string, AttributeValue>
             {
-                [PartitionKey] = new AttributeValue { S = keyId },
-                [SortKey] = new AttributeValue { N = created.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture) },
+                [PartitionKey] = new() { S = keyId },
+                [SortKey] = new() { N = created.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture) },
                 [AttributeKeyRecord] = keyRecordAttribute
             };
 

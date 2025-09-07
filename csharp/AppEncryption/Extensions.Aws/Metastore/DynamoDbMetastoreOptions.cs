@@ -1,5 +1,3 @@
-using System;
-
 namespace GoDaddy.Asherah.AppEncryption.Extensions.Aws.Metastore;
 
 /// <summary>

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Threading.Tasks;
 using Testcontainers.DynamoDb;
@@ -6,18 +7,19 @@ using Xunit;
 
 namespace GoDaddy.Asherah.AppEncryption.Tests.Fixtures;
 
-public class DynamoDBContainerFixture : IAsyncLifetime
+[ExcludeFromCodeCoverage]
+public class DynamoDbContainerFixture : IAsyncLifetime
 {
     private readonly string _localServiceUrl;
     private readonly DynamoDbContainer _dynamoDbContainer;
 
-    public DynamoDBContainerFixture()
+    public DynamoDbContainerFixture()
     {
         var disableTestContainers = Convert.ToBoolean(Environment.GetEnvironmentVariable("DISABLE_TESTCONTAINERS"), CultureInfo.InvariantCulture);
 
         if (disableTestContainers)
         {
-            string hostname = Environment.GetEnvironmentVariable("DYNAMODB_HOSTNAME") ?? "localhost";
+            var hostname = Environment.GetEnvironmentVariable("DYNAMODB_HOSTNAME") ?? "localhost";
             _localServiceUrl = $"http://{hostname}:8000";
         }
         else

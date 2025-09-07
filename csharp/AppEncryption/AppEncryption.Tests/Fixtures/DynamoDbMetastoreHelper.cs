@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.DocumentModel;
@@ -10,11 +11,11 @@ using GoDaddy.Asherah.AppEncryption.Persistence;
 using GoDaddy.Asherah.AppEncryption.Util;
 using Newtonsoft.Json.Linq;
 using Xunit;
-using static GoDaddy.Asherah.AppEncryption.Persistence.DynamoDbMetastoreImpl;
 
 namespace GoDaddy.Asherah.AppEncryption.Tests.Fixtures;
 
-public static class DynamoMetastoreHelper
+[ExcludeFromCodeCoverage]
+public static class DynamoDbMetastoreHelper
 {
     public const string ExistingTestKey = "some_key";
     public static readonly Dictionary<string, object> ExistingKeyRecord = new Dictionary<string, object>
@@ -37,13 +38,13 @@ public static class DynamoMetastoreHelper
     private static Table CreateTableInstance(IAmazonDynamoDB client, string tableName, string region)
     {
         // Create the old DynamoDB implementation
-        DynamoDbMetastoreImpl dynamoDbMetastoreImpl = NewBuilder(region)
+        var dynamoDbMetastoreImpl = DynamoDbMetastoreImpl.NewBuilder(region)
             .WithEndPointConfiguration(client.Config.ServiceURL, region)
             .WithTableName(tableName)
             .Build();
 
         // Create the table instance
-        return (Table)new TableBuilder(client, dynamoDbMetastoreImpl.TableName)
+        return new TableBuilder(client, dynamoDbMetastoreImpl.TableName)
             .AddHashKey(PartitionKey, DynamoDBEntryType.String)
             .AddRangeKey(SortKey, DynamoDBEntryType.Numeric)
             .Build();
@@ -51,8 +52,8 @@ public static class DynamoMetastoreHelper
 
     private static async Task InsertDocumentAsync(Table table, string keyId, DateTimeOffset created, Dictionary<string, object> keyRecordDict)
     {
-        JObject jObject = JObject.FromObject(keyRecordDict);
-        Document document = new Document
+        var jObject = JObject.FromObject(keyRecordDict);
+        var document = new Document
         {
             [PartitionKey] = keyId,
             [SortKey] = created.ToUnixTimeSeconds(),
@@ -64,32 +65,32 @@ public static class DynamoMetastoreHelper
 
     public static async Task CreateTableSchema(AmazonDynamoDBClient client, string tableName)
     {
-        CreateTableRequest request = new CreateTableRequest
+        var request = new CreateTableRequest
         {
             TableName = tableName,
-            AttributeDefinitions = new List<AttributeDefinition>
-            {
+            AttributeDefinitions =
+            [
                 new AttributeDefinition(PartitionKey, ScalarAttributeType.S),
-                new AttributeDefinition(SortKey, ScalarAttributeType.N),
-            },
-            KeySchema = new List<KeySchemaElement>
-            {
+                new AttributeDefinition(SortKey, ScalarAttributeType.N)
+            ],
+            KeySchema =
+            [
                 new KeySchemaElement(PartitionKey, KeyType.HASH),
-                new KeySchemaElement(SortKey, KeyType.RANGE),
-            },
+                new KeySchemaElement(SortKey, KeyType.RANGE)
+            ],
             ProvisionedThroughput = new ProvisionedThroughput(1L, 1L),
         };
 
-        CreateTableResponse createTableResponse = await client.CreateTableAsync(request);
+        await client.CreateTableAsync(request);
     }
 
     public static async Task<DateTimeOffset> PrePopulateTestDataUsingOldMetastore(IAmazonDynamoDB client, string tableName, string region)
     {
-        Table table = CreateTableInstance(client, tableName, region);
+        var table = CreateTableInstance(client, tableName, region);
 
         // Test data
-        string testKeyWithRegionSuffix = ExistingTestKey + "_" + region;
-        DateTimeOffset created = DateTimeOffset.Now.AddDays(-1);
+        var testKeyWithRegionSuffix = ExistingTestKey + "_" + region;
+        var created = DateTimeOffset.Now.AddDays(-1);
 
         // Pre-populate test data
         await InsertDocumentAsync(table, ExistingTestKey, created, ExistingKeyRecord);
@@ -100,10 +101,10 @@ public static class DynamoMetastoreHelper
 
     public static async Task AddKeyRecordUsingOldMetastore(IAmazonDynamoDB client, string tableName, string region, string keyId, DateTimeOffset created, KeyRecord keyRecord)
     {
-        Table table = CreateTableInstance(client, tableName, region);
+        var table = CreateTableInstance(client, tableName, region);
 
         // Convert KeyRecord to Dictionary<string, object> format
-        Dictionary<string, object> keyRecordDict = new Dictionary<string, object>
+        var keyRecordDict = new Dictionary<string, object>
         {
             { "Key", keyRecord.Key },
             { "Created", keyRecord.Created.ToUnixTimeSeconds() }
@@ -135,7 +136,7 @@ public static class DynamoMetastoreHelper
         MetricsUtil.SetMetricsInstance(AppMetrics.CreateDefaultBuilder().Build());
 
         // Create the old DynamoDB implementation
-        DynamoDbMetastoreImpl dynamoDbMetastoreImpl = NewBuilder(region)
+        var dynamoDbMetastoreImpl = DynamoDbMetastoreImpl.NewBuilder(region)
             .WithEndPointConfiguration(client.Config.ServiceURL, region)
             .WithTableName(tableName)
             .Build();
@@ -148,14 +149,14 @@ public static class DynamoMetastoreHelper
         var loadedKeyRecord = (JObject)loadedJsonObject;
 
         // Validate the properties
-        Assert.Equal(expectedKeyRecord.Key, loadedKeyRecord["Key"].ToString());
-        Assert.Equal(expectedKeyRecord.Created.ToUnixTimeSeconds(), loadedKeyRecord["Created"].ToObject<long>());
+        Assert.Equal(expectedKeyRecord.Key, loadedKeyRecord["Key"]!.ToString());
+        Assert.Equal(expectedKeyRecord.Created.ToUnixTimeSeconds(), loadedKeyRecord["Created"]!.ToObject<long>());
 
         // Validate Revoked
         if (expectedKeyRecord.Revoked.HasValue)
         {
             Assert.True(loadedKeyRecord.ContainsKey("Revoked"));
-            Assert.Equal(expectedKeyRecord.Revoked.Value, loadedKeyRecord["Revoked"].ToObject<bool>());
+            Assert.Equal(expectedKeyRecord.Revoked.Value, loadedKeyRecord["Revoked"]!.ToObject<bool>());
         }
         else
         {
@@ -166,9 +167,9 @@ public static class DynamoMetastoreHelper
         if (expectedKeyRecord.ParentKeyMeta != null)
         {
             Assert.True(loadedKeyRecord.ContainsKey("ParentKeyMeta"));
-            var parentKeyMeta = loadedKeyRecord["ParentKeyMeta"].ToObject<JObject>();
-            Assert.Equal(expectedKeyRecord.ParentKeyMeta.Id, parentKeyMeta["KeyId"].ToString());
-            Assert.Equal(expectedKeyRecord.ParentKeyMeta.Created.ToUnixTimeSeconds(), parentKeyMeta["Created"].ToObject<long>());
+            var parentKeyMeta = loadedKeyRecord["ParentKeyMeta"]!.ToObject<JObject>();
+            Assert.Equal(expectedKeyRecord.ParentKeyMeta.Id, parentKeyMeta["KeyId"]!.ToString());
+            Assert.Equal(expectedKeyRecord.ParentKeyMeta.Created.ToUnixTimeSeconds(), parentKeyMeta["Created"]!.ToObject<long>());
         }
         else
         {

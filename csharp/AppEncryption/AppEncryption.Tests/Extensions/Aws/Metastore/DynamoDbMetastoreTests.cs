@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Amazon.DynamoDBv2;
@@ -12,7 +13,8 @@ using Xunit;
 
 namespace GoDaddy.Asherah.AppEncryption.Tests.Extensions.Aws.Metastore;
 
-public class DynamoDbMetastoreTests : IClassFixture<DynamoDBContainerFixture>, IDisposable
+[ExcludeFromCodeCoverage]
+public class DynamoDbMetastoreTests : IClassFixture<DynamoDbContainerFixture>, IDisposable
 {
     private const string TestTableName = "TestKeysTable";
     private const string TestRegion = "us-west-2";
@@ -22,32 +24,30 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDBContainerFixture>, I
     private readonly DynamoDbMetastoreOptions _options;
     private readonly DateTimeOffset _created;
 
-    public DynamoDbMetastoreTests(DynamoDBContainerFixture dynamoDbContainerFixture)
+    public DynamoDbMetastoreTests(DynamoDbContainerFixture dynamoDbContainerFixture)
     {
-        string serviceUrl = dynamoDbContainerFixture.GetServiceUrl();
-        AmazonDynamoDBConfig clientConfig = new AmazonDynamoDBConfig
+        var serviceUrl = dynamoDbContainerFixture.GetServiceUrl();
+        AmazonDynamoDBConfig clientConfig = new()
         {
             ServiceURL = serviceUrl,
             AuthenticationRegion = TestRegion,
         };
         _amazonDynamoDbClient = new AmazonDynamoDBClient(clientConfig);
 
-        DynamoMetastoreHelper.CreateTableSchema(_amazonDynamoDbClient, TestTableName).Wait();
+        DynamoDbMetastoreHelper.CreateTableSchema(_amazonDynamoDbClient, TestTableName).Wait();
 
         _options = new DynamoDbMetastoreOptions(TestTableName);
         _dynamoDbMetastore = new DynamoDbMetastore(_amazonDynamoDbClient, _options);
 
         // Pre-populate test data using helper and capture the created timestamp
-        _created = DynamoMetastoreHelper.PrePopulateTestDataUsingOldMetastore(_amazonDynamoDbClient, TestTableName, TestRegion).Result;
+        _created = DynamoDbMetastoreHelper.PrePopulateTestDataUsingOldMetastore(_amazonDynamoDbClient, TestTableName, TestRegion).Result;
     }
 
     public void Dispose()
     {
         try
         {
-            DeleteTableResponse deleteTableResponse = _amazonDynamoDbClient
-                .DeleteTableAsync(TestTableName)
-                .Result;
+            _ = _amazonDynamoDbClient.DeleteTableAsync(TestTableName).Result;
         }
         catch (AggregateException)
         {
@@ -58,19 +58,19 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDBContainerFixture>, I
     private static void VerifyKeyRecordMatchesExpected(KeyRecord loadedKeyRecord)
     {
         // Test Key property
-        Assert.Equal((string)DynamoMetastoreHelper.ExistingKeyRecord["Key"], loadedKeyRecord.Key);
+        Assert.Equal((string)DynamoDbMetastoreHelper.ExistingKeyRecord["Key"], loadedKeyRecord.Key);
 
         // Test Created property
-        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds((long)(int)DynamoMetastoreHelper.ExistingKeyRecord["Created"]), loadedKeyRecord.Created);
+        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds((int)DynamoDbMetastoreHelper.ExistingKeyRecord["Created"]), loadedKeyRecord.Created);
 
         // Test Revoked property (should be null since not in test data)
         Assert.Null(loadedKeyRecord.Revoked);
 
         // Test ParentKeyMeta property
         Assert.NotNull(loadedKeyRecord.ParentKeyMeta);
-        var expectedParentKeyMeta = (Dictionary<string, object>)DynamoMetastoreHelper.ExistingKeyRecord["ParentKeyMeta"];
+        var expectedParentKeyMeta = (Dictionary<string, object>)DynamoDbMetastoreHelper.ExistingKeyRecord["ParentKeyMeta"];
         Assert.Equal((string)expectedParentKeyMeta["KeyId"], loadedKeyRecord.ParentKeyMeta.Id);
-        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds((long)(int)expectedParentKeyMeta["Created"]), loadedKeyRecord.ParentKeyMeta.Created);
+        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds((int)expectedParentKeyMeta["Created"]), loadedKeyRecord.ParentKeyMeta.Created);
     }
 
     private DynamoDbMetastore CreateMetastoreWithBrokenDynamoClient()
@@ -102,7 +102,7 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDBContainerFixture>, I
     [Fact]
     public async Task TestLoadSuccess()
     {
-        var (found, loadedKeyRecord) = await _dynamoDbMetastore.TryLoadAsync(DynamoMetastoreHelper.ExistingTestKey, _created);
+        var (found, loadedKeyRecord) = await _dynamoDbMetastore.TryLoadAsync(DynamoDbMetastoreHelper.ExistingTestKey, _created);
 
         Assert.True(found);
         Assert.NotNull(loadedKeyRecord);
@@ -121,7 +121,7 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDBContainerFixture>, I
     [Fact]
     public async Task TestLoadLatestWithSingleRecord()
     {
-        var (found, loadedKeyRecord) = await _dynamoDbMetastore.TryLoadLatestAsync(DynamoMetastoreHelper.ExistingTestKey);
+        var (found, loadedKeyRecord) = await _dynamoDbMetastore.TryLoadLatestAsync(DynamoDbMetastoreHelper.ExistingTestKey);
 
         Assert.True(found);
         Assert.NotNull(loadedKeyRecord);
@@ -141,25 +141,25 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDBContainerFixture>, I
     public async Task TestLoadLatestWithMultipleRecords()
     {
         // Create multiple records with different timestamps
-        DateTimeOffset createdMinusOneHour = _created.AddHours(-1);
-        DateTimeOffset createdPlusOneHour = _created.AddHours(1);
-        DateTimeOffset createdMinusOneDay = _created.AddDays(-1);
-        DateTimeOffset createdPlusOneDay = _created.AddDays(1);
+        var createdMinusOneHour = _created.AddHours(-1);
+        var createdPlusOneHour = _created.AddHours(1);
+        var createdMinusOneDay = _created.AddDays(-1);
+        var createdPlusOneDay = _created.AddDays(1);
 
         // Create test KeyRecord objects
-        var keyRecordMinusOneHour = new KeyRecord(createdMinusOneHour, "key_minus_one_hour", null, null);
-        var keyRecordPlusOneHour = new KeyRecord(createdPlusOneHour, "key_plus_one_hour", null, null);
-        var keyRecordMinusOneDay = new KeyRecord(createdMinusOneDay, "key_minus_one_day", null, null);
-        var keyRecordPlusOneDay = new KeyRecord(createdPlusOneDay, "key_plus_one_day", null, null);
+        var keyRecordMinusOneHour = new KeyRecord(createdMinusOneHour, "key_minus_one_hour", null);
+        var keyRecordPlusOneHour = new KeyRecord(createdPlusOneHour, "key_plus_one_hour", null);
+        var keyRecordMinusOneDay = new KeyRecord(createdMinusOneDay, "key_minus_one_day", null);
+        var keyRecordPlusOneDay = new KeyRecord(createdPlusOneDay, "key_plus_one_day", null);
 
         // Insert records using the old metastore (intentionally mixing up insertion order)
-        await DynamoMetastoreHelper.AddKeyRecordUsingOldMetastore(_amazonDynamoDbClient, TestTableName, TestRegion, DynamoMetastoreHelper.ExistingTestKey, createdPlusOneHour, keyRecordPlusOneHour);
-        await DynamoMetastoreHelper.AddKeyRecordUsingOldMetastore(_amazonDynamoDbClient, TestTableName, TestRegion, DynamoMetastoreHelper.ExistingTestKey, createdPlusOneDay, keyRecordPlusOneDay);
-        await DynamoMetastoreHelper.AddKeyRecordUsingOldMetastore(_amazonDynamoDbClient, TestTableName, TestRegion, DynamoMetastoreHelper.ExistingTestKey, createdMinusOneHour, keyRecordMinusOneHour);
-        await DynamoMetastoreHelper.AddKeyRecordUsingOldMetastore(_amazonDynamoDbClient, TestTableName, TestRegion, DynamoMetastoreHelper.ExistingTestKey, createdMinusOneDay, keyRecordMinusOneDay);
+        await DynamoDbMetastoreHelper.AddKeyRecordUsingOldMetastore(_amazonDynamoDbClient, TestTableName, TestRegion, DynamoDbMetastoreHelper.ExistingTestKey, createdPlusOneHour, keyRecordPlusOneHour);
+        await DynamoDbMetastoreHelper.AddKeyRecordUsingOldMetastore(_amazonDynamoDbClient, TestTableName, TestRegion, DynamoDbMetastoreHelper.ExistingTestKey, createdPlusOneDay, keyRecordPlusOneDay);
+        await DynamoDbMetastoreHelper.AddKeyRecordUsingOldMetastore(_amazonDynamoDbClient, TestTableName, TestRegion, DynamoDbMetastoreHelper.ExistingTestKey, createdMinusOneHour, keyRecordMinusOneHour);
+        await DynamoDbMetastoreHelper.AddKeyRecordUsingOldMetastore(_amazonDynamoDbClient, TestTableName, TestRegion, DynamoDbMetastoreHelper.ExistingTestKey, createdMinusOneDay, keyRecordMinusOneDay);
 
         // Test that LoadLatest returns the record with the latest timestamp
-        var (found, loadedKeyRecord) = await _dynamoDbMetastore.TryLoadLatestAsync(DynamoMetastoreHelper.ExistingTestKey);
+        var (found, loadedKeyRecord) = await _dynamoDbMetastore.TryLoadLatestAsync(DynamoDbMetastoreHelper.ExistingTestKey);
 
         Assert.True(found);
         Assert.NotNull(loadedKeyRecord);
@@ -174,7 +174,7 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDBContainerFixture>, I
         var brokenMetastore = CreateMetastoreWithBrokenDynamoClient();
 
         await Assert.ThrowsAsync<Exception>(
-            () => brokenMetastore.TryLoadAsync(DynamoMetastoreHelper.ExistingTestKey, _created));
+            () => brokenMetastore.TryLoadAsync(DynamoDbMetastoreHelper.ExistingTestKey, _created));
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDBContainerFixture>, I
         var brokenMetastore = CreateMetastoreWithBrokenDynamoClient();
 
         await Assert.ThrowsAsync<Exception>(
-            () => brokenMetastore.TryLoadLatestAsync(DynamoMetastoreHelper.ExistingTestKey));
+            () => brokenMetastore.TryLoadLatestAsync(DynamoDbMetastoreHelper.ExistingTestKey));
     }
 
     [Fact]
@@ -206,9 +206,9 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDBContainerFixture>, I
     public async Task TestStore(bool? revoked, bool hasParentKeyMeta)
     {
         // Arrange
-        string testKeyId = "test_store_key";
-        DateTimeOffset testCreated = DateTimeOffset.Now;
-        KeyMeta parentKeyMeta = hasParentKeyMeta ? new KeyMeta("parent_key_id", DateTimeOffset.Now.AddDays(-1)) : null;
+        var testKeyId = "test_store_key";
+        var testCreated = DateTimeOffset.Now;
+        var parentKeyMeta = hasParentKeyMeta ? new KeyMeta("parent_key_id", DateTimeOffset.Now.AddDays(-1)) : null;
 
         var testKeyRecord = new KeyRecord(
             testCreated,
@@ -218,7 +218,7 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDBContainerFixture>, I
         );
 
         // Act
-        bool storeResult = await _dynamoDbMetastore.StoreAsync(testKeyId, testCreated, testKeyRecord);
+        var storeResult = await _dynamoDbMetastore.StoreAsync(testKeyId, testCreated, testKeyRecord);
 
         // Assert
         Assert.True(storeResult);
@@ -243,7 +243,7 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDBContainerFixture>, I
         }
 
         // Verify the stored record can also be loaded by the old metastore implementation
-        DynamoMetastoreHelper.VerifyKeyRecordUsingOldMetastore(_amazonDynamoDbClient, TestTableName, TestRegion, testKeyId, testKeyRecord);
+        DynamoDbMetastoreHelper.VerifyKeyRecordUsingOldMetastore(_amazonDynamoDbClient, TestTableName, TestRegion, testKeyId, testKeyRecord);
     }
 
     [Fact]
@@ -251,9 +251,9 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDBContainerFixture>, I
     {
         // Arrange
         var brokenMetastore = CreateMetastoreWithBrokenDynamoClientForStore();
-        string testKeyId = "test_store_key";
-        DateTimeOffset testCreated = DateTimeOffset.Now;
-        var testKeyRecord = new KeyRecord(testCreated, "test_encrypted_key_data", null, null);
+        var testKeyId = "test_store_key";
+        var testCreated = DateTimeOffset.Now;
+        var testKeyRecord = new KeyRecord(testCreated, "test_encrypted_key_data", null);
 
         // Act & Assert
         await Assert.ThrowsAsync<Exception>(
@@ -264,13 +264,13 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDBContainerFixture>, I
     public async Task TestStoreWithDuplicateShouldReturnFalse()
     {
         // Arrange
-        string testKeyId = "test_duplicate_key";
-        DateTimeOffset testCreated = DateTimeOffset.Now;
-        var testKeyRecord = new KeyRecord(testCreated, "test_encrypted_key_data", null, null);
+        var testKeyId = "test_duplicate_key";
+        var testCreated = DateTimeOffset.Now;
+        var testKeyRecord = new KeyRecord(testCreated, "test_encrypted_key_data", null);
 
         // Act
-        bool firstAttempt = await _dynamoDbMetastore.StoreAsync(testKeyId, testCreated, testKeyRecord);
-        bool secondAttempt = await _dynamoDbMetastore.StoreAsync(testKeyId, testCreated, testKeyRecord);
+        var firstAttempt = await _dynamoDbMetastore.StoreAsync(testKeyId, testCreated, testKeyRecord);
+        var secondAttempt = await _dynamoDbMetastore.StoreAsync(testKeyId, testCreated, testKeyRecord);
 
         // Assert
         Assert.True(firstAttempt);
