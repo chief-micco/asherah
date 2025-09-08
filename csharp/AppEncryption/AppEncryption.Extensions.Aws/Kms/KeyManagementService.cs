@@ -30,12 +30,17 @@ namespace GoDaddy.Asherah.AppEncryption.Extensions.Aws.Kms
         private static readonly Action<ILogger, string, Exception> LogFailedGenerateDataKey = LoggerMessage.Define<string>(
             LogLevel.Warning,
             new EventId(1, nameof(KeyManagementService)),
-            "Failed to generate data key via ARN {Arn} KMS, trying next ARN");
+            "Failed to generate data key via region {Region} KMS, trying next region");
 
         private static readonly Action<ILogger, Exception> LogEncryptError = LoggerMessage.Define(
             LogLevel.Error,
             new EventId(2, nameof(KeyManagementService)),
             "Unexpected execution exception while encrypting KMS data key");
+
+        private static readonly Action<ILogger, string, Exception> LogDecryptWarning = LoggerMessage.Define<string>(
+            LogLevel.Warning,
+            new EventId(3, nameof(KeyManagementService)),
+            "Failed to decrypt via region {Region} KMS, trying next region");
 
         /// <summary>
         /// Initializes a new instance of the <see cref="KeyManagementService"/> class.
@@ -74,9 +79,34 @@ namespace GoDaddy.Asherah.AppEncryption.Extensions.Aws.Kms
         }
 
         /// <inheritdoc/>
-        public Task<CryptoKey> DecryptKeyAsync(byte[] keyCipherText, DateTimeOffset keyCreated, bool revoked)
+        public async Task<CryptoKey> DecryptKeyAsync(byte[] keyCipherText, DateTimeOffset keyCreated, bool revoked)
         {
-            throw new NotImplementedException();
+            var kmsKeyEnvelope = JsonSerializer.Deserialize<KmsKeyEnvelope>(keyCipherText);
+            byte[] encryptedKey = Convert.FromBase64String(kmsKeyEnvelope.EncryptedKey);
+
+            foreach (var kmsArnClient in _kmsArnClients)
+            {
+                var matchingKmsKek = kmsKeyEnvelope.KmsKeks.FirstOrDefault(kek =>
+                    kek.Region.Equals(kmsArnClient.Region, StringComparison.OrdinalIgnoreCase));
+
+                if (matchingKmsKek == null)
+                {
+                    continue;
+                }
+
+                byte[] kmsKeyEncryptionKey = Convert.FromBase64String(matchingKmsKek.EncryptedKek);
+
+                try
+                {
+                    return await DecryptKmsEncryptedKey(kmsArnClient, encryptedKey, keyCreated, kmsKeyEncryptionKey, revoked);
+                }
+                catch (Exception ex)
+                {
+                    LogDecryptWarning(_logger, kmsArnClient.Region, ex);
+                }
+            }
+
+            throw new KmsException("Could not successfully decrypt key using any regions");
         }
 
         /// <inheritdoc/>
@@ -150,11 +180,58 @@ namespace GoDaddy.Asherah.AppEncryption.Extensions.Aws.Kms
                 }
                 catch (Exception ex)
                 {
-                    LogFailedGenerateDataKey(_logger, kmsArnClient.Arn, ex);
+                    LogFailedGenerateDataKey(_logger, kmsArnClient.Region, ex);
                 }
             }
 
-            throw new KmsException("could not successfully generate data key using any regions");
+            throw new KmsException("Could not successfully generate data key using any regions");
+        }
+
+        /// <summary>
+        /// Decrypts a KMS encrypted key using the specified client and parameters.
+        /// </summary>
+        /// <param name="kmsArnClient">The KMS ARN client containing client, region, and ARN.</param>
+        /// <param name="encryptedKey">The encrypted key to decrypt.</param>
+        /// <param name="keyCreated">When the key was created.</param>
+        /// <param name="kmsKeyEncryptionKey">The encrypted KMS key.</param>
+        /// <param name="revoked">Whether the key is revoked.</param>
+        /// <returns>The decrypted crypto key.</returns>
+        private async Task<CryptoKey> DecryptKmsEncryptedKey(
+            KmsArnClient kmsArnClient,
+            byte[] encryptedKey,
+            DateTimeOffset keyCreated,
+            byte[] kmsKeyEncryptionKey,
+            bool revoked)
+        {
+            DecryptResponse response;
+            byte[] plaintextBackingBytes;
+
+            // Create a MemoryStream that we will dispose properly
+            using (MemoryStream ciphertextBlobStream = new MemoryStream(kmsKeyEncryptionKey))
+            {
+                DecryptRequest request = new DecryptRequest
+                {
+                    CiphertextBlob = ciphertextBlobStream,
+                };
+
+                response = await kmsArnClient.Client.DecryptAsync(request);
+            }
+
+            // Use proper disposal of the response plaintext stream and securely handle the sensitive bytes
+            using (MemoryStream plaintextStream = response.Plaintext)
+            {
+                // Extract the plaintext bytes so we can wipe them in case of an exception
+                plaintextBackingBytes = plaintextStream.GetBuffer();
+
+                try
+                {
+                    return _crypto.DecryptKey(encryptedKey, keyCreated, _crypto.GenerateKeyFromBytes(plaintextBackingBytes), revoked);
+                }
+                finally
+                {
+                    ManagedBufferUtils.WipeByteArray(plaintextBackingBytes);
+                }
+            }
         }
 
         /// <summary>
