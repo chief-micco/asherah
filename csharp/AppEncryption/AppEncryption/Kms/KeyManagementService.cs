@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using GoDaddy.Asherah.Crypto.Keys;
 
 namespace GoDaddy.Asherah.AppEncryption.Kms
@@ -8,7 +9,7 @@ namespace GoDaddy.Asherah.AppEncryption.Kms
     /// which in turn is used to encrypt the system keys. It enables the user to use a HSM for providing the master key
     /// or staying cloud agnostic if using a hosted key management service.
     /// </summary>
-    public abstract class KeyManagementService
+    public abstract class KeyManagementService : IKeyManagementService
     {
         /// <summary>
         /// Encrypts a <see cref="CryptoKey"/> using the implemented key management service.
@@ -27,6 +28,30 @@ namespace GoDaddy.Asherah.AppEncryption.Kms
         /// <param name="revoked">Revoked status of the key. True if revoked, else False.</param>
         /// <returns>The decrypted key.</returns>
         public abstract CryptoKey DecryptKey(byte[] keyCipherText, DateTimeOffset keyCreated, bool revoked);
+
+        /// <summary>
+        /// Encrypts a <see cref="CryptoKey"/> using the implemented key management service.
+        /// </summary>
+        ///
+        /// <param name="key">The key to encrypt.</param>
+        /// <returns>The encrypted key in form of a byte[].</returns>
+        public virtual async Task<byte[]> EncryptKeyAsync(CryptoKey key)
+        {
+            return await Task.FromResult(EncryptKey(key));
+        }
+
+        /// <summary>
+        /// Takes the encrypted key as the parameter and decrypts the key using the implemented key management service.
+        /// </summary>
+        ///
+        /// <param name="keyCipherText">The encrypted key.</param>
+        /// <param name="keyCreated">Creation time of the key.</param>
+        /// <param name="revoked">Revoked status of the key. True if revoked, else False.</param>
+        /// <returns>The decrypted key.</returns>
+        public virtual async Task<CryptoKey> DecryptKeyAsync(byte[] keyCipherText, DateTimeOffset keyCreated, bool revoked)
+        {
+            return await Task.FromResult(DecryptKey(keyCipherText, keyCreated, revoked));
+        }
 
         /// <summary>
         /// Decrypts a certain key using the implemented key management service and then applies
