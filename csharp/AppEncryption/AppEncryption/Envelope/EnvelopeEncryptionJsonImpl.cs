@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using App.Metrics.Timer;
 using GoDaddy.Asherah.AppEncryption.Exceptions;
 using GoDaddy.Asherah.AppEncryption.Kms;
@@ -164,6 +165,18 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
 
                 return wrapperDocument.ToJObject();
             }
+        }
+
+        /// <inheritdoc/>
+        public virtual async Task<byte[]> DecryptDataRowRecordAsync(JObject dataRowRecord)
+        {
+            return await Task.FromResult(DecryptDataRowRecord(dataRowRecord));
+        }
+
+        /// <inheritdoc/>
+        public virtual async Task<JObject> EncryptPayloadAsync(byte[] payload)
+        {
+            return await Task.FromResult(EncryptPayload(payload));
         }
 
         /// <inheritdoc/>

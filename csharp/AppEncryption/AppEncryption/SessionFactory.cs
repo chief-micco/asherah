@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using App.Metrics;
 using App.Metrics.Concurrency;
 using GoDaddy.Asherah.AppEncryption.Envelope;
@@ -465,6 +466,16 @@ namespace GoDaddy.Asherah.AppEncryption
             public JObject EncryptPayload(byte[] payload)
             {
                 return envelopeEncryptionJsonImpl.EncryptPayload(payload);
+            }
+
+            public async Task<byte[]> DecryptDataRowRecordAsync(JObject dataRowRecord)
+            {
+                return await envelopeEncryptionJsonImpl.DecryptDataRowRecordAsync(dataRowRecord);
+            }
+
+            public async Task<JObject> EncryptPayloadAsync(byte[] payload)
+            {
+                return await envelopeEncryptionJsonImpl.EncryptPayloadAsync(payload);
             }
 
             internal void IncrementUsageTracker()
