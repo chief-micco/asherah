@@ -36,7 +36,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         private readonly SecureCryptoKeyDictionary<DateTimeOffset> _systemKeyCache;
         private readonly SecureCryptoKeyDictionary<DateTimeOffset> _intermediateKeyCache;
         private readonly CryptoPolicy _cryptoPolicy;
-        private readonly KeyManagementService _keyManagementService;
+        private readonly IKeyManagementService _keyManagementService;
         private readonly ILogger _logger;
 
         /// <summary>
@@ -57,7 +57,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
             IKeyMetastore metastore,
             SecureCryptoKeyDictionary<DateTimeOffset> systemKeyCache,
             SecureCryptoKeyDictionary<DateTimeOffset> intermediateKeyCache,
-            KeyManagementService keyManagementService,
+            IKeyManagementService keyManagementService,
             ILogger logger)
         {
             _partition = partition;

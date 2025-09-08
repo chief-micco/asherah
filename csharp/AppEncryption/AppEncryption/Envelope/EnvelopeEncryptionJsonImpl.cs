@@ -35,7 +35,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         private readonly SecureCryptoKeyDictionary<DateTimeOffset> intermediateKeyCache;
         private readonly AeadEnvelopeCrypto crypto;
         private readonly CryptoPolicy cryptoPolicy;
-        private readonly KeyManagementService keyManagementService;
+        private readonly IKeyManagementService keyManagementService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EnvelopeEncryptionJsonImpl"/> class using the provided
@@ -55,7 +55,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         /// envelopes.</param>
         /// <param name="cryptoPolicy">A <see cref="GoDaddy.Asherah.Crypto.CryptoPolicy"/> implementation that dictates
         /// the various behaviors of Asherah.</param>
-        /// <param name="keyManagementService">A <see cref="GoDaddy.Asherah.AppEncryption.Kms.KeyManagementService"/>
+        /// <param name="keyManagementService">A <see cref="GoDaddy.Asherah.AppEncryption.Kms.IKeyManagementService"/>
         /// implementation that generates the top level master key and encrypts the system keys using the master key.
         /// </param>
         /// <param name="logger">The logger implementation to use.</param>
@@ -66,7 +66,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
             SecureCryptoKeyDictionary<DateTimeOffset> intermediateKeyCache,
             AeadEnvelopeCrypto aeadEnvelopeCrypto,
             CryptoPolicy cryptoPolicy,
-            KeyManagementService keyManagementService,
+            IKeyManagementService keyManagementService,
             ILogger logger)
         {
             this.partition = partition;
@@ -97,7 +97,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         /// envelopes.</param>
         /// <param name="cryptoPolicy">A <see cref="GoDaddy.Asherah.Crypto.CryptoPolicy"/> implementation that dictates
         /// the various behaviors of Asherah.</param>
-        /// <param name="keyManagementService">A <see cref="GoDaddy.Asherah.AppEncryption.Kms.KeyManagementService"/>
+        /// <param name="keyManagementService">A <see cref="GoDaddy.Asherah.AppEncryption.Kms.IKeyManagementService"/>
         /// implementation that generates the top level master key and encrypts the system keys using the master key.
         /// </param>
         public EnvelopeEncryptionJsonImpl(
@@ -107,7 +107,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
             SecureCryptoKeyDictionary<DateTimeOffset> intermediateKeyCache,
             AeadEnvelopeCrypto aeadEnvelopeCrypto,
             CryptoPolicy cryptoPolicy,
-            KeyManagementService keyManagementService)
+            IKeyManagementService keyManagementService)
             : this(partition, metastore, systemKeyCache, intermediateKeyCache, aeadEnvelopeCrypto, cryptoPolicy, keyManagementService, null)
         {
         }

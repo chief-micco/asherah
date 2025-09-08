@@ -41,7 +41,7 @@ namespace GoDaddy.Asherah.AppEncryption
         private readonly IMetastore<JObject> metastore;
         private readonly SecureCryptoKeyDictionary<DateTimeOffset> systemKeyCache;
         private readonly CryptoPolicy cryptoPolicy;
-        private readonly KeyManagementService keyManagementService;
+        private readonly IKeyManagementService keyManagementService;
         private readonly ConcurrentDictionary<string, object> semaphoreLocks;
 
         /// <summary>
@@ -56,7 +56,7 @@ namespace GoDaddy.Asherah.AppEncryption
         /// caching system keys.</param>
         /// <param name="cryptoPolicy">A <see cref="GoDaddy.Asherah.Crypto.CryptoPolicy"/> implementation that dictates
         /// the various behaviors of Asherah.</param>
-        /// <param name="keyManagementService">A <see cref="GoDaddy.Asherah.AppEncryption.Kms.KeyManagementService"/>
+        /// <param name="keyManagementService">A <see cref="GoDaddy.Asherah.AppEncryption.Kms.IKeyManagementService"/>
         /// implementation that generates the top level master key and encrypts the system keys using the master key.
         /// </param>
         public SessionFactory(
@@ -65,7 +65,7 @@ namespace GoDaddy.Asherah.AppEncryption
             IMetastore<JObject> metastore,
             SecureCryptoKeyDictionary<DateTimeOffset> systemKeyCache,
             CryptoPolicy cryptoPolicy,
-            KeyManagementService keyManagementService)
+            IKeyManagementService keyManagementService)
             : this(productId, serviceId, metastore, systemKeyCache, cryptoPolicy, keyManagementService, null)
         {
         }
@@ -82,7 +82,7 @@ namespace GoDaddy.Asherah.AppEncryption
         /// caching system keys.</param>
         /// <param name="cryptoPolicy">A <see cref="GoDaddy.Asherah.Crypto.CryptoPolicy"/> implementation that dictates
         /// the various behaviors of Asherah.</param>
-        /// <param name="keyManagementService">A <see cref="GoDaddy.Asherah.AppEncryption.Kms.KeyManagementService"/>
+        /// <param name="keyManagementService">A <see cref="GoDaddy.Asherah.AppEncryption.Kms.IKeyManagementService"/>
         /// implementation that generates the top level master key and encrypts the system keys using the master key.
         /// </param>
         /// <param name="logger">A logger implementation.</param>
@@ -92,7 +92,7 @@ namespace GoDaddy.Asherah.AppEncryption
             IMetastore<JObject> metastore,
             SecureCryptoKeyDictionary<DateTimeOffset> systemKeyCache,
             CryptoPolicy cryptoPolicy,
-            KeyManagementService keyManagementService,
+            IKeyManagementService keyManagementService,
             ILogger logger)
         {
             this.productId = productId;
@@ -168,11 +168,11 @@ namespace GoDaddy.Asherah.AppEncryption
             /// Initialize a session factory builder step with the provided key management service.
             /// </summary>
             ///
-            /// <param name="keyManagementService">The <see cref="KeyManagementService"/> implementation to use.</param>
+            /// <param name="keyManagementService">The <see cref="IKeyManagementService"/> implementation to use.</param>
             ///
             /// <returns>The current <see cref="IBuildStep"/> instance initialized with some
             /// <see cref="keyManagementService"/> implementation.</returns>
-            IBuildStep WithKeyManagementService(KeyManagementService keyManagementService);
+            IBuildStep WithKeyManagementService(IKeyManagementService keyManagementService);
         }
 
         public interface IBuildStep
@@ -506,7 +506,7 @@ namespace GoDaddy.Asherah.AppEncryption
 
             private IMetastore<JObject> metastore;
             private CryptoPolicy cryptoPolicy;
-            private KeyManagementService keyManagementService;
+            private IKeyManagementService keyManagementService;
             private IMetrics metrics;
             private ILogger _logger;
 
@@ -546,7 +546,7 @@ namespace GoDaddy.Asherah.AppEncryption
                 return this;
             }
 
-            public IBuildStep WithKeyManagementService(KeyManagementService kms)
+            public IBuildStep WithKeyManagementService(IKeyManagementService kms)
             {
                 keyManagementService = kms;
                 return this;
