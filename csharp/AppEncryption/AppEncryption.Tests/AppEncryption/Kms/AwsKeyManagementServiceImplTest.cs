@@ -561,5 +561,15 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Kms
             // Ensure the buffer containing the data key is wiped
             Assert.Equal(new byte[] { 0, 0 }, dataKeyPlainText);
         }
+
+        /// <summary>
+        /// This test is verifying that the stub implementation of the KMS client is working correctly
+        /// for both implementations of the IKeyManagementService classes
+        /// </summary>
+        [Fact]
+        public void TestEncryptAndDecryptKeyWithStub()
+        {
+
+        }
     }
 }

@@ -11,7 +11,7 @@ using GoDaddy.Asherah.AppEncryption.Tests.Fixtures;
 using Moq;
 using Xunit;
 
-namespace GoDaddy.Asherah.AppEncryption.Tests.Extensions.Aws.Metastore;
+namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Extensions.Aws.Metastore;
 
 [ExcludeFromCodeCoverage]
 public class DynamoDbMetastoreTests : IClassFixture<DynamoDbContainerFixture>, IDisposable
