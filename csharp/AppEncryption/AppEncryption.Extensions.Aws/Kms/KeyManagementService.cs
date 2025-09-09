@@ -220,10 +220,8 @@ namespace GoDaddy.Asherah.AppEncryption.Extensions.Aws.Kms
             // Use proper disposal of the response plaintext stream and securely handle the sensitive bytes
             using (MemoryStream plaintextStream = response.Plaintext)
             {
-                // Get the plaintext bytes
-                plaintextBackingBytes = new byte[plaintextStream.Length];
-                plaintextStream.Position = 0;
-                plaintextStream.Read(plaintextBackingBytes, 0, plaintextBackingBytes.Length);
+                // Extract the plaintext bytes so we can wipe them in case of an exception
+                plaintextBackingBytes = plaintextStream.GetBuffer();
 
                 try
                 {

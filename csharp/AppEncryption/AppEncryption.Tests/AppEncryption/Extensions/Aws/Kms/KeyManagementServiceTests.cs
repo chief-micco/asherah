@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
@@ -7,9 +6,6 @@ using GoDaddy.Asherah.AppEncryption.Extensions.Aws.Kms;
 using GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.TestHelpers;
 using GoDaddy.Asherah.Crypto.Engine.BouncyCastle;
 using GoDaddy.Asherah.Crypto.ExtensionMethods;
-using GoDaddy.Asherah.Crypto.Keys;
-using Microsoft.Extensions.Logging;
-using Moq;
 using Xunit;
 
 namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Extensions.Aws.Kms
@@ -22,25 +18,22 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Extensions.Aws.Kms
         private const string UsWest1 = "us-west-1";
         private const string ArnUsWest1 = "arn-us-west-1";
 
-        private readonly KeyManagementServiceOptions _keyManagementServiceOptions;
         private readonly KeyManagementService _keyManagementService;
-        private readonly LoggerFactoryStub _loggerFactoryStub;
-        private readonly KeyManagementClientFactoryStub _clientFactoryStub;
 
         public KeyManagementServiceTests()
         {
-            _keyManagementServiceOptions = new KeyManagementServiceOptions
+            var keyManagementServiceOptions = new KeyManagementServiceOptions
             {
-                RegionKeyArns = new List<RegionKeyArn>
-                {
+                RegionKeyArns =
+                [
                     new RegionKeyArn { Region = UsEast1, KeyArn = ArnUsEast1 },
                     new RegionKeyArn { Region = UsWest1, KeyArn = ArnUsWest1 }
-                }
+                ]
             };
 
-            _loggerFactoryStub = new LoggerFactoryStub();
-            _clientFactoryStub = new KeyManagementClientFactoryStub(_keyManagementServiceOptions);
-            _keyManagementService = new KeyManagementService(_keyManagementServiceOptions, _clientFactoryStub, _loggerFactoryStub);
+            var loggerFactoryStub = new LoggerFactoryStub();
+            var clientFactoryStub = new KeyManagementClientFactoryStub(keyManagementServiceOptions);
+            _keyManagementService = new KeyManagementService(keyManagementServiceOptions, clientFactoryStub, loggerFactoryStub);
         }
 
         [Fact]

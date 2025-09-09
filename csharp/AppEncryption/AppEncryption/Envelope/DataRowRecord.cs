@@ -1,4 +1,3 @@
-using System;
 using GoDaddy.Asherah.AppEncryption.Metastore;
 
 namespace GoDaddy.Asherah.AppEncryption.Envelope

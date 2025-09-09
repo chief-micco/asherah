@@ -10,9 +10,14 @@ using Amazon.KeyManagementService;
 using Amazon.KeyManagementService.Model;
 using Amazon.Runtime;
 using GoDaddy.Asherah.AppEncryption.Exceptions;
+using GoDaddy.Asherah.AppEncryption.Extensions.Aws.Kms;
 using GoDaddy.Asherah.AppEncryption.Kms;
+using GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Extensions.Aws.Kms;
+using GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.TestHelpers;
+using GoDaddy.Asherah.Crypto.Engine.BouncyCastle;
 using GoDaddy.Asherah.Crypto.Envelope;
 using GoDaddy.Asherah.Crypto.Exceptions;
+using GoDaddy.Asherah.Crypto.ExtensionMethods;
 using GoDaddy.Asherah.Crypto.Keys;
 using LanguageExt;
 using Microsoft.Extensions.Logging;
@@ -569,7 +574,33 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Kms
         [Fact]
         public void TestEncryptAndDecryptKeyWithStub()
         {
+            var options = new KeyManagementServiceOptions
+            {
+                RegionKeyArns =
+                [
+                    new RegionKeyArn { Region = UsEast1, KeyArn = ArnUsEast1 },
+                    new RegionKeyArn { Region = UsWest1, KeyArn = ArnUsWest1 }
+                ]
+            };
+            var awsKeyManagementServiceImpl = new AwsKeyManagementServiceImpl(
+                regionToArnDictionary,
+                preferredRegion,
+                new BouncyAes256GcmCrypto(),
+                new KeyManagementClientFactoryStub(options),
+                new AnonymousAWSCredentials(),
+                new LoggerFactoryStub().CreateLogger("AwsKeyManagementServiceImplTest")
+            );
 
+            using var crypto = new BouncyAes256GcmCrypto();
+            var keyCreationTime = DateTimeOffset.UtcNow.Truncate(TimeSpan.FromMinutes(1));
+            using var originalKey = crypto.GenerateKey(keyCreationTime);
+
+            // Act
+            var encryptedResult = awsKeyManagementServiceImpl.EncryptKey(originalKey);
+            var decryptedKey = awsKeyManagementServiceImpl.DecryptKey(encryptedResult, keyCreationTime, revoked: false);
+
+            // Assert
+            Assert.NotNull(decryptedKey);
         }
     }
 }

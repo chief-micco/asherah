@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Amazon.KeyManagementService;
@@ -75,12 +73,12 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Extensions.Aws.Kms
 
         public Task<DecryptResponse> DecryptAsync(DecryptRequest request, CancellationToken cancellationToken = default)
         {
-            // Read the ciphertext from the request
+            // Read the ciphertext from the request using GetBuffer() like the real implementations
             byte[] ciphertext;
             using (var stream = request.CiphertextBlob)
             {
                 ciphertext = new byte[stream.Length];
-                stream.Read(ciphertext, 0, ciphertext.Length);
+                stream.ReadExactly(ciphertext, 0, ciphertext.Length);
             }
 
             // Verify that the first bytes match the _keyBytes
@@ -104,7 +102,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Extensions.Aws.Kms
             // Simply copy the modified bytes to plaintext
             var response = new DecryptResponse
             {
-                Plaintext = new MemoryStream(plaintext)
+                Plaintext = new MemoryStream(plaintext, 0, plaintext.Length, false, true),
             };
 
             return Task.FromResult(response);
@@ -208,7 +206,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Extensions.Aws.Kms
             using (var stream = request.Plaintext)
             {
                 plaintext = new byte[stream.Length];
-                stream.Read(plaintext, 0, plaintext.Length);
+                stream.ReadExactly(plaintext, 0, plaintext.Length);
             }
 
             // Prepend the _keyBytes to the beginning of the plaintext

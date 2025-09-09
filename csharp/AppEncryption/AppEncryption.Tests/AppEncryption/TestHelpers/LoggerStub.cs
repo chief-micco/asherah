@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using Microsoft.Extensions.Logging;
 
 namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.TestHelpers
