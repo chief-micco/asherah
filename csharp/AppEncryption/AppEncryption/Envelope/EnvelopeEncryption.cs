@@ -79,7 +79,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         /// <inheritdoc/>
         public byte[] EncryptPayload(byte[] payload)
         {
-            throw new NotImplementedException("Implementation will be added later");
+            return EncryptPayloadAsync(payload).GetAwaiter().GetResult();
         }
 
         /// <inheritdoc/>
@@ -115,9 +115,182 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         }
 
         /// <inheritdoc/>
-        public Task<byte[]> EncryptPayloadAsync(byte[] payload)
+        public async Task<byte[]> EncryptPayloadAsync(byte[] payload)
         {
-            throw new NotImplementedException("Implementation will be added later");
+            var result = await WithIntermediateKeyForWrite(intermediateCryptoKey => _crypto.EnvelopeEncrypt<MetastoreKeyMeta>(
+                payload,
+                intermediateCryptoKey,
+                new MetastoreKeyMeta { KeyId = _partition.IntermediateKeyId, Created = intermediateCryptoKey.GetCreated() }));
+
+            var keyRecord = new DataRowRecordKey
+            {
+                Created = DateTimeOffset.UtcNow,
+                Key = Convert.ToBase64String(result.EncryptedKey),
+                ParentKeyMeta = result.UserState
+            };
+
+            var dataRowRecord = new DataRowRecord
+            {
+                Key = keyRecord,
+                Data = Convert.ToBase64String(result.CipherText)
+            };
+
+            return JsonSerializer.SerializeToUtf8Bytes(dataRowRecord, JsonOptions);
+        }
+
+        /// <summary>
+        /// Executes a function with the intermediate key for write operations.
+        /// </summary>
+        /// <param name="functionWithIntermediateKey">the function to call using the decrypted intermediate key.</param>
+        /// <returns>The result of the function execution.</returns>
+        private async Task<T> WithIntermediateKeyForWrite<T>(Func<CryptoKey, T> functionWithIntermediateKey)
+        {
+            // Try to get latest from cache. If not found or expired, get latest or create
+            CryptoKey intermediateKey = _intermediateKeyCache.GetLast();
+
+            if (intermediateKey == null || IsKeyExpiredOrRevoked(intermediateKey))
+            {
+                intermediateKey = await GetLatestOrCreateIntermediateKey();
+
+                // Put the key into our cache if allowed
+                if (_cryptoPolicy.CanCacheIntermediateKeys())
+                {
+                    try
+                    {
+                        intermediateKey = _intermediateKeyCache.PutAndGetUsable(intermediateKey.GetCreated(), intermediateKey);
+                    }
+                    catch (Exception ex)
+                    {
+                        DisposeKey(intermediateKey, ex);
+                        throw new AppEncryptionException("Unable to update cache for Intermediate Key", ex);
+                    }
+                }
+            }
+
+            return ApplyFunctionAndDisposeKey(intermediateKey, functionWithIntermediateKey);
+        }
+
+        /// <summary>
+        /// Executes a function with the system key for write operations.
+        /// </summary>
+        /// <param name="functionWithSystemKey">the function to call using the decrypted system key.</param>
+        /// <returns>The result of the function execution.</returns>
+        private async Task<T> WithSystemKeyForWrite<T>(Func<CryptoKey, T> functionWithSystemKey)
+        {
+            // Try to get latest from cache. If not found or expired, get latest or create
+            var systemKey = _systemKeyCache.GetLast();
+            if (systemKey == null || IsKeyExpiredOrRevoked(systemKey))
+            {
+                systemKey = await GetLatestOrCreateSystemKey();
+
+                // Put the key into our cache if allowed
+                if (_cryptoPolicy.CanCacheSystemKeys())
+                {
+                    try
+                    {
+                        var systemKeyMeta = new MetastoreKeyMeta { KeyId = _partition.SystemKeyId, Created = systemKey.GetCreated() };
+                        systemKey = _systemKeyCache.PutAndGetUsable(systemKeyMeta.Created, systemKey);
+                    }
+                    catch (Exception ex)
+                    {
+                        DisposeKey(systemKey, ex);
+                        throw new AppEncryptionException("Unable to update cache for SystemKey", ex);
+                    }
+                }
+            }
+
+            return ApplyFunctionAndDisposeKey(systemKey, functionWithSystemKey);
+        }
+
+        /// <summary>
+        /// Gets the latest intermediate key or creates a new one if needed.
+        /// </summary>
+        /// <returns>The latest or newly created intermediate key.</returns>
+        private async Task<CryptoKey> GetLatestOrCreateIntermediateKey()
+        {
+            // Phase 1: Try to load the latest intermediate key
+            var (found, newestIntermediateKeyRecord) = await _metastore.TryLoadLatestAsync(_partition.IntermediateKeyId);
+
+            if (found)
+            {
+                // If the key we just got back isn't expired, then just use it
+                if (!IsKeyExpiredOrRevoked(newestIntermediateKeyRecord))
+                {
+                    try
+                    {
+                        if (newestIntermediateKeyRecord.ParentKeyMeta == null)
+                        {
+                            throw new MetadataMissingException("Could not find parentKeyMeta (SK) for intermediateKey");
+                        }
+
+                        return await WithExistingSystemKey(
+                            newestIntermediateKeyRecord.ParentKeyMeta,
+                            true,
+                            key => DecryptKey(newestIntermediateKeyRecord, key));
+                    }
+                    catch (MetadataMissingException ex)
+                    {
+                        _logger?.LogWarning(
+                            ex,
+                            "The SK for the IK ({KeyId}, {Created}) is missing or in an invalid state. Will create new IK instead.",
+                            _partition.IntermediateKeyId,
+                            newestIntermediateKeyRecord.Created);
+                    }
+                }
+
+                // If we're here, we have an expired key and will create a new one
+                // Fall through to Phase 2: create new key
+            }
+
+            // Phase 2: Create new intermediate key
+            var intermediateKeyCreated = _cryptoPolicy.TruncateToIntermediateKeyPrecision(DateTime.UtcNow);
+            var intermediateKey = _crypto.GenerateKey(intermediateKeyCreated);
+
+            try
+            {
+                var newIntermediateKeyRecord = await WithSystemKeyForWrite(systemCryptoKey =>
+                    new KeyRecord(
+                        intermediateKey.GetCreated(),
+                        Convert.ToBase64String(_crypto.EncryptKey(intermediateKey, systemCryptoKey)),
+                        false,
+                        new MetastoreKeyMeta { KeyId = _partition.SystemKeyId, Created = systemCryptoKey.GetCreated() }));
+
+                if (await _metastore.StoreAsync(_partition.IntermediateKeyId, newIntermediateKeyRecord.Created, newIntermediateKeyRecord))
+                {
+                    return intermediateKey;
+                }
+                else
+                {
+                    // Duplicate detected - dispose the key we created
+                    DisposeKey(intermediateKey, null);
+                }
+            }
+            catch (Exception ex)
+            {
+                DisposeKey(intermediateKey, ex);
+                throw new AppEncryptionException("Unable to create new Intermediate Key", ex);
+            }
+
+            // If we're here, storing failed (duplicate detected). Load the actual latest key
+            var (retryFound, actualLatestIntermediateKeyRecord) = await _metastore.TryLoadLatestAsync(_partition.IntermediateKeyId);
+
+            if (retryFound)
+            {
+                if (actualLatestIntermediateKeyRecord.ParentKeyMeta == null)
+                {
+                    throw new MetadataMissingException("Could not find parentKeyMeta (SK) for intermediateKey");
+                }
+
+                // Decrypt and return the actual latest key
+                return await WithExistingSystemKey(
+                    actualLatestIntermediateKeyRecord.ParentKeyMeta,
+                    true,
+                    key => DecryptKey(actualLatestIntermediateKeyRecord, key));
+            }
+            else
+            {
+                throw new AppEncryptionException("IntermediateKey not present after LoadLatestKeyRecord retry");
+            }
         }
 
         /// <summary>
@@ -179,7 +352,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
             return await WithExistingSystemKey(
                 intermediateKeyRecord.ParentKeyMeta,
                 false, // treatExpiredAsMissing = false (allow expired keys)
-                systemKey => Task.FromResult(DecryptKey(intermediateKeyRecord, systemKey)));
+                systemKey => DecryptKey(intermediateKeyRecord, systemKey));
         }
 
         /// <summary>
@@ -197,10 +370,10 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         /// <exception cref="MetadataMissingException">If the system key is not found, or if its expired/revoked and
         /// <see cref="treatExpiredAsMissing"/> is <value>true</value>.</exception>
         private async Task<T> WithExistingSystemKey<T>(
-            IKeyMeta systemKeyMeta, bool treatExpiredAsMissing, Func<CryptoKey, Task<T>> functionWithSystemKey)
+            IKeyMeta systemKeyMeta, bool treatExpiredAsMissing, Func<CryptoKey, T> functionWithSystemKey)
         {
             // Get from cache or lookup previously used key
-            CryptoKey systemKey = _systemKeyCache.Get(systemKeyMeta.Created);
+            var systemKey = _systemKeyCache.Get(systemKeyMeta.Created);
 
             if (systemKey == null)
             {
@@ -230,7 +403,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
                 }
             }
 
-            return await ApplyFunctionAndDisposeKey(systemKey, functionWithSystemKey);
+            return ApplyFunctionAndDisposeKey(systemKey, functionWithSystemKey);
         }
 
         /// <summary>
@@ -250,10 +423,76 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
                 throw new MetadataMissingException($"Could not find EnvelopeKeyRecord with keyId = {systemKeyMeta.KeyId}, created = {systemKeyMeta.Created}");
             }
 
-            return _keyManagementService.DecryptKey(
+            return await _keyManagementService.DecryptKeyAsync(
                 Convert.FromBase64String(systemKeyRecord.Key),
                 systemKeyRecord.Created,
                 systemKeyRecord.Revoked ?? false);
+        }
+
+        /// <summary>
+        /// Gets the latest system key or creates a new one if needed.
+        /// </summary>
+        /// <returns>The latest or newly created system key.</returns>
+        private async Task<CryptoKey> GetLatestOrCreateSystemKey()
+        {
+            // Phase 1: Load existing key
+            var (found, newestSystemKeyRecord) = await _metastore.TryLoadLatestAsync(_partition.SystemKeyId);
+
+            if (found)
+            {
+                // If the key we just got back isn't expired, then just use it
+                if (!IsKeyExpiredOrRevoked(newestSystemKeyRecord))
+                {
+                    return await _keyManagementService.DecryptKeyAsync(
+                        Convert.FromBase64String(newestSystemKeyRecord.Key),
+                        newestSystemKeyRecord.Created,
+                        newestSystemKeyRecord.Revoked ?? false);
+                }
+
+                // If we're here then we're doing inline rotation and have an expired key.
+                // Fall through as if we didn't have the key
+            }
+
+            // Phase 2: Create new key
+            var systemKeyCreated = _cryptoPolicy.TruncateToSystemKeyPrecision(DateTimeOffset.UtcNow);
+            var systemKey = _crypto.GenerateKey(systemKeyCreated);
+            try
+            {
+                var newSystemKeyRecord = new KeyRecord(
+                    systemKey.GetCreated(),
+                    Convert.ToBase64String(await _keyManagementService.EncryptKeyAsync(systemKey)),
+                    false,
+                    null); // No parent key for system keys
+
+                if (await _metastore.StoreAsync(_partition.SystemKeyId, newSystemKeyRecord.Created, newSystemKeyRecord))
+                {
+                    return systemKey;
+                }
+                else
+                {
+                    DisposeKey(systemKey, null);
+                }
+            }
+            catch (Exception ex)
+            {
+                DisposeKey(systemKey, ex);
+                throw new AppEncryptionException("Unable to store new System Key", ex);
+            }
+
+            // Phase 3: Retry logic - if storing failed, load the latest key
+            var (retryFound, actualLatestSystemKeyRecord) = await _metastore.TryLoadLatestAsync(_partition.SystemKeyId);
+
+            if (retryFound)
+            {
+                return await _keyManagementService.DecryptKeyAsync(
+                    Convert.FromBase64String(actualLatestSystemKeyRecord.Key),
+                    actualLatestSystemKeyRecord.Created,
+                    actualLatestSystemKeyRecord.Revoked ?? false);
+            }
+            else
+            {
+                throw new AppEncryptionException("SystemKey not present after LoadLatestKeyRecord retry");
+            }
         }
 
         /// <summary>
@@ -274,6 +513,16 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         }
 
         /// <summary>
+        /// Checks if a key record is expired or revoked.
+        /// </summary>
+        /// <param name="keyRecord">The key record to check.</param>
+        /// <returns>True if the key record is expired or revoked, false otherwise.</returns>
+        private bool IsKeyExpiredOrRevoked(IKeyRecord keyRecord)
+        {
+            return _cryptoPolicy.IsKeyExpired(keyRecord.Created) || (keyRecord.Revoked ?? false);
+        }
+
+        /// <summary>
         /// Checks if a key is expired or revoked.
         /// </summary>
         /// <param name="cryptoKey">The crypto key to check.</param>
@@ -289,11 +538,11 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         /// <param name="key">The crypto key to use.</param>
         /// <param name="functionWithKey">The function to execute with the key.</param>
         /// <returns>The result of the function execution.</returns>
-        private static async Task<T> ApplyFunctionAndDisposeKey<T>(CryptoKey key, Func<CryptoKey, Task<T>> functionWithKey)
+        private static T ApplyFunctionAndDisposeKey<T>(CryptoKey key, Func<CryptoKey, T> functionWithKey)
         {
             try
             {
-                return await functionWithKey(key);
+                return functionWithKey(key);
             }
             catch (Exception ex)
             {
