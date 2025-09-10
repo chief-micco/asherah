@@ -12,22 +12,13 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Extensions.Aws.Kms
     /// <summary>
     /// Stub implementation of IAmazonKeyManagementService for testing purposes.
     /// </summary>
+    /// <remarks>
+    /// Initializes a new instance of the <see cref="AwsKeyManagementStub"/> class.
+    /// </remarks>
+    /// <param name="keyArn">The key ARN for this stub.</param>
     [ExcludeFromCodeCoverage]
-    public class AwsKeyManagementStub : IAmazonKeyManagementService
+    public class AwsKeyManagementStub(string keyArn) : IAmazonKeyManagementService
     {
-        private readonly string _keyArn;
-        private readonly byte[] _keyBytes;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="AwsKeyManagementStub"/> class.
-        /// </summary>
-        /// <param name="keyArn">The key ARN for this stub.</param>
-        public AwsKeyManagementStub(string keyArn)
-        {
-            _keyArn = keyArn;
-            _keyBytes = System.Text.Encoding.UTF8.GetBytes(_keyArn);
-        }
-
         public Amazon.Runtime.IClientConfig Config => throw new NotImplementedException();
         public IKeyManagementServicePaginatorFactory Paginators => throw new NotImplementedException();
 
@@ -81,23 +72,25 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Extensions.Aws.Kms
                 stream.ReadExactly(ciphertext, 0, ciphertext.Length);
             }
 
+            var keyBytes = System.Text.Encoding.UTF8.GetBytes(keyArn);
+
             // Verify that the first bytes match the _keyBytes
-            if (ciphertext.Length < _keyBytes.Length)
+            if (ciphertext.Length < keyBytes.Length)
             {
-                throw new ArgumentException($"Ciphertext too short. Expected at least {_keyBytes.Length} bytes, got {ciphertext.Length}");
+                throw new AmazonServiceException($"Ciphertext too short. Expected at least {keyBytes.Length} bytes, got {ciphertext.Length}");
             }
 
-            for (int i = 0; i < _keyBytes.Length; i++)
+            for (var i = 0; i < keyBytes.Length; i++)
             {
-                if (ciphertext[i] != _keyBytes[i])
+                if (ciphertext[i] != keyBytes[i])
                 {
-                    throw new ArgumentException($"Ciphertext key bytes don't match expected _keyBytes at position {i}");
+                    throw new AmazonServiceException($"Ciphertext key bytes don't match expected _keyBytes at position {i}");
                 }
             }
 
             // Remove the _keyBytes from the beginning of the ciphertext
-            var plaintext = new byte[ciphertext.Length - _keyBytes.Length];
-            Array.Copy(ciphertext, _keyBytes.Length, plaintext, 0, plaintext.Length);
+            var plaintext = new byte[ciphertext.Length - keyBytes.Length];
+            Array.Copy(ciphertext, keyBytes.Length, plaintext, 0, plaintext.Length);
 
             // Simply copy the modified bytes to plaintext
             var response = new DecryptResponse
@@ -196,9 +189,9 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Extensions.Aws.Kms
         public Task<EncryptResponse> EncryptAsync(EncryptRequest request, CancellationToken cancellationToken = default)
         {
             // Validate the KeyId matches our stored KeyArn
-            if (request.KeyId != _keyArn)
+            if (request.KeyId != keyArn)
             {
-                throw new ArgumentException($"KeyId '{request.KeyId}' does not match expected KeyArn '{_keyArn}'");
+                throw new ArgumentException($"KeyId '{request.KeyId}' does not match expected KeyArn '{keyArn}'");
             }
 
             // Read the plaintext from the request
@@ -209,16 +202,18 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Extensions.Aws.Kms
                 stream.ReadExactly(plaintext, 0, plaintext.Length);
             }
 
+            var keyBytes = System.Text.Encoding.UTF8.GetBytes(keyArn);
+
             // Prepend the _keyBytes to the beginning of the plaintext
-            var ciphertext = new byte[_keyBytes.Length + plaintext.Length];
-            Array.Copy(_keyBytes, 0, ciphertext, 0, _keyBytes.Length);
-            Array.Copy(plaintext, 0, ciphertext, _keyBytes.Length, plaintext.Length);
+            var ciphertext = new byte[keyBytes.Length + plaintext.Length];
+            Array.Copy(keyBytes, 0, ciphertext, 0, keyBytes.Length);
+            Array.Copy(plaintext, 0, ciphertext, keyBytes.Length, plaintext.Length);
 
             // Simply copy the modified bytes to ciphertext blob
             var response = new EncryptResponse
             {
                 CiphertextBlob = new MemoryStream(ciphertext, 0, ciphertext.Length, true, true),
-                KeyId = _keyArn
+                KeyId = keyArn
             };
             return Task.FromResult(response);
         }
@@ -226,20 +221,20 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Extensions.Aws.Kms
         public Task<GenerateDataKeyResponse> GenerateDataKeyAsync(GenerateDataKeyRequest request, CancellationToken cancellationToken = default)
         {
             // Validate the KeyId matches our stored KeyArn
-            if (request.KeyId != _keyArn)
+            if (request.KeyId != keyArn)
             {
-                throw new ArgumentException($"KeyId '{request.KeyId}' does not match expected KeyArn '{_keyArn}'");
+                throw new ArgumentException($"KeyId '{request.KeyId}' does not match expected KeyArn '{keyArn}'");
             }
 
             // Generate fake data based on the _keyArn to make it unique per ARN
-            byte[] fakePlaintext = GenerateFakeDataFromArn(_keyArn, "plaintext");
-            byte[] fakeCiphertext = GenerateFakeDataFromArn(_keyArn, "ciphertext");
+            var fakePlaintext = GenerateFakeDataFromArn(keyArn, "plaintext");
+            var fakeCiphertext = GenerateFakeDataFromArn(keyArn, "ciphertext");
 
             var response = new GenerateDataKeyResponse
             {
                 Plaintext = new MemoryStream(fakePlaintext, 0, fakePlaintext.Length, true, true),
                 CiphertextBlob = new MemoryStream(fakeCiphertext, 0, fakeCiphertext.Length, true, true),
-                KeyId = _keyArn
+                KeyId = keyArn
             };
             return Task.FromResult(response);
         }

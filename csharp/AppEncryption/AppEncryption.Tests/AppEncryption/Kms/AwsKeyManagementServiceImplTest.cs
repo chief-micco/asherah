@@ -601,6 +601,8 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Kms
 
             // Assert
             Assert.NotNull(decryptedKey);
+            Assert.Equal(originalKey.WithKey(keyBytes => keyBytes), decryptedKey.WithKey(keyBytes => keyBytes));
+            Assert.Equal(originalKey.GetCreated(), decryptedKey.GetCreated());
         }
     }
 }
