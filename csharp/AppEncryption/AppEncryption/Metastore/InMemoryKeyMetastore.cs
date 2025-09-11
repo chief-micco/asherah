@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
@@ -10,12 +9,12 @@ namespace GoDaddy.Asherah.AppEncryption.Metastore
     /// Provides a volatile implementation of <see cref="IKeyMetastore"/> for key records using a
     /// <see cref="System.Data.DataTable"/>. NOTE: This should NEVER be used in a production environment.
     /// </summary>
-    public class InMemoryKeyMetastoreImpl : IKeyMetastore, IDisposable
+    public class InMemoryKeyMetastore : IKeyMetastore, IDisposable
     {
-        private readonly DataTable dataTable;
+        private readonly DataTable _dataTable;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="InMemoryKeyMetastoreImpl"/> class, with 3 columns.
+        /// Initializes a new instance of the <see cref="InMemoryKeyMetastore"/> class, with 3 columns.
         /// <code>
         /// keyId | created | keyRecord
         /// ----- | ------- | ---------
@@ -24,21 +23,21 @@ namespace GoDaddy.Asherah.AppEncryption.Metastore
         /// </code>
         /// Uses 'keyId' and 'created' as the primary key.
         /// </summary>
-        public InMemoryKeyMetastoreImpl()
+        public InMemoryKeyMetastore()
         {
-            dataTable = new DataTable();
-            dataTable.Columns.Add("keyId", typeof(string));
-            dataTable.Columns.Add("created", typeof(DateTimeOffset));
-            dataTable.Columns.Add("keyRecord", typeof(KeyRecord));
-            dataTable.PrimaryKey = new[] { dataTable.Columns["keyId"], dataTable.Columns["created"] };
+            _dataTable = new DataTable();
+            _dataTable.Columns.Add("keyId", typeof(string));
+            _dataTable.Columns.Add("created", typeof(DateTimeOffset));
+            _dataTable.Columns.Add("keyRecord", typeof(KeyRecord));
+            _dataTable.PrimaryKey = new[] { _dataTable.Columns["keyId"], _dataTable.Columns["created"] };
         }
 
         /// <inheritdoc />
         public Task<(bool found, IKeyRecord keyRecord)> TryLoadAsync(string keyId, DateTimeOffset created)
         {
-            lock (dataTable)
+            lock (_dataTable)
             {
-                List<DataRow> dataRows = dataTable.Rows.Cast<DataRow>()
+                var dataRows = _dataTable.Rows.Cast<DataRow>()
                     .Where(row => row["keyId"].Equals(keyId)
                                   && row["created"].Equals(created))
                     .ToList();
@@ -55,9 +54,9 @@ namespace GoDaddy.Asherah.AppEncryption.Metastore
         /// <inheritdoc />
         public Task<(bool found, IKeyRecord keyRecord)> TryLoadLatestAsync(string keyId)
         {
-            lock (dataTable)
+            lock (_dataTable)
             {
-                List<DataRow> dataRows = dataTable.Rows.Cast<DataRow>()
+                var dataRows = _dataTable.Rows.Cast<DataRow>()
                     .Where(row => row["keyId"].Equals(keyId))
                     .OrderBy(row => row["created"])
                     .ToList();
@@ -76,9 +75,9 @@ namespace GoDaddy.Asherah.AppEncryption.Metastore
         /// <inheritdoc />
         public Task<bool> StoreAsync(string keyId, DateTimeOffset created, IKeyRecord keyRecord)
         {
-            lock (dataTable)
+            lock (_dataTable)
             {
-                List<DataRow> dataRows = dataTable.Rows.Cast<DataRow>()
+                var dataRows = _dataTable.Rows.Cast<DataRow>()
                     .Where(row => row["keyId"].Equals(keyId)
                                   && row["created"].Equals(created))
                     .ToList();
@@ -87,7 +86,7 @@ namespace GoDaddy.Asherah.AppEncryption.Metastore
                     return Task.FromResult(false);
                 }
 
-                dataTable.Rows.Add(keyId, created, keyRecord);
+                _dataTable.Rows.Add(keyId, created, keyRecord);
                 return Task.FromResult(true);
             }
         }
@@ -112,9 +111,14 @@ namespace GoDaddy.Asherah.AppEncryption.Metastore
         /// <param name="disposing">True if called from Dispose, false if called from finalizer.</param>
         protected virtual void Dispose(bool disposing)
         {
-            if (disposing)
+            if (!disposing)
             {
-                dataTable?.Dispose();
+                return;
+            }
+
+            lock (_dataTable)
+            {
+                _dataTable?.Dispose();
             }
         }
     }

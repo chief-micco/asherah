@@ -1,5 +1,6 @@
 using System;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using GoDaddy.Asherah.AppEncryption.Exceptions;
 using GoDaddy.Asherah.AppEncryption.Metastore;
@@ -21,12 +22,24 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
     /// </summary>
     internal sealed class EnvelopeEncryption : IEnvelopeEncryption<byte[]>
     {
-        private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
+        private static readonly JsonSerializerOptions JsonReadOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
             Converters = {
                 new InterfaceConverter<DataRowRecordKey, IKeyRecord>(),
-                new InterfaceConverter<MetastoreKeyMeta, IKeyMeta>()
+                new InterfaceConverter<MetastoreKeyMeta, IKeyMeta>(),
+                new UnixTimestampDateTimeOffsetConverter()
+            }
+        };
+
+        private static readonly JsonSerializerOptions JsonWriteOptions = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            WriteIndented = false,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            Converters =
+            {
+                new UnixTimestampDateTimeOffsetConverter()
             }
         };
 
@@ -43,30 +56,30 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         /// Initializes a new instance of the <see cref="EnvelopeEncryption"/> class.
         /// </summary>
         /// <param name="partition">The partition for this envelope encryption instance.</param>
+        /// <param name="metastore">The metastore for storing and retrieving keys.</param>
+        /// <param name="keyManagementService">Service for key management operations.</param>
         /// <param name="crypto">The crypto implementation for envelope operations.</param>
         /// <param name="cryptoPolicy">Policy that dictates crypto behaviors.</param>
-        /// <param name="metastore">The metastore for storing and retrieving keys.</param>
         /// <param name="systemKeyCache">Cache for system keys.</param>
         /// <param name="intermediateKeyCache">Cache for intermediate keys.</param>
-        /// <param name="keyManagementService">Service for key management operations.</param>
         /// <param name="logger">The logger implementation to use.</param>
         public EnvelopeEncryption(
             Partition partition,
+            IKeyMetastore metastore,
+            IKeyManagementService keyManagementService,
             AeadEnvelopeCrypto crypto,
             CryptoPolicy cryptoPolicy,
-            IKeyMetastore metastore,
             SecureCryptoKeyDictionary<DateTimeOffset> systemKeyCache,
             SecureCryptoKeyDictionary<DateTimeOffset> intermediateKeyCache,
-            IKeyManagementService keyManagementService,
             ILogger logger)
         {
             _partition = partition;
+            _metastore = metastore;
+            _keyManagementService = keyManagementService;
             _crypto = crypto;
             _cryptoPolicy = cryptoPolicy;
-            _metastore = metastore;
             _systemKeyCache = systemKeyCache;
             _intermediateKeyCache = intermediateKeyCache;
-            _keyManagementService = keyManagementService;
             _logger = logger;
         }
 
@@ -85,9 +98,9 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         /// <inheritdoc/>
         public async Task<byte[]> DecryptDataRowRecordAsync(byte[] dataRowRecord)
         {
-            DataRowRecord dataRowRecordModel = DeserializeDataRowRecord(dataRowRecord);
+            var dataRowRecordModel = DeserializeDataRowRecord(dataRowRecord);
 
-            if (dataRowRecordModel.Key?.ParentKeyMeta == null)
+            if (dataRowRecordModel.Key?.ParentKeyMeta?.KeyId == null)
             {
                 throw new MetadataMissingException("Could not find parentKeyMeta {IK} for dataRowKey");
             }
@@ -99,10 +112,10 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
 
             // the Data property is a base64 encoded string containing the encrypted payload
             // the Key property from the DataRowRecord.Key is a base64 encoded string containing the encrypted key
-            byte[] payloadEncrypted = Convert.FromBase64String(dataRowRecordModel.Data);
-            byte[] encryptedKey = Convert.FromBase64String(dataRowRecordModel.Key.Key);
+            var payloadEncrypted = Convert.FromBase64String(dataRowRecordModel.Data);
+            var encryptedKey = Convert.FromBase64String(dataRowRecordModel.Key.Key);
 
-            byte[] decryptedPayload = await WithIntermediateKeyForRead(
+            var decryptedPayload = await WithIntermediateKeyForRead(
                 dataRowRecordModel.Key.ParentKeyMeta,
                 intermediateCryptoKey =>
                     _crypto.EnvelopeDecrypt(
@@ -117,7 +130,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         /// <inheritdoc/>
         public async Task<byte[]> EncryptPayloadAsync(byte[] payload)
         {
-            var result = await WithIntermediateKeyForWrite(intermediateCryptoKey => _crypto.EnvelopeEncrypt<MetastoreKeyMeta>(
+            var result = await WithIntermediateKeyForWrite(intermediateCryptoKey => _crypto.EnvelopeEncrypt(
                 payload,
                 intermediateCryptoKey,
                 new MetastoreKeyMeta { KeyId = _partition.IntermediateKeyId, Created = intermediateCryptoKey.GetCreated() }));
@@ -135,7 +148,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
                 Data = Convert.ToBase64String(result.CipherText)
             };
 
-            return JsonSerializer.SerializeToUtf8Bytes(dataRowRecord, JsonOptions);
+            return JsonSerializer.SerializeToUtf8Bytes(dataRowRecord, JsonWriteOptions);
         }
 
         /// <summary>
@@ -146,7 +159,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         private async Task<T> WithIntermediateKeyForWrite<T>(Func<CryptoKey, T> functionWithIntermediateKey)
         {
             // Try to get latest from cache. If not found or expired, get latest or create
-            CryptoKey intermediateKey = _intermediateKeyCache.GetLast();
+            var intermediateKey = _intermediateKeyCache.GetLast();
 
             if (intermediateKey == null || IsKeyExpiredOrRevoked(intermediateKey))
             {
@@ -302,7 +315,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         private async Task<byte[]> WithIntermediateKeyForRead(
             IKeyMeta intermediateKeyMeta, Func<CryptoKey, byte[]> functionWithIntermediateKey)
         {
-            CryptoKey intermediateKey = _intermediateKeyCache.Get(intermediateKeyMeta.Created);
+            var intermediateKey = _intermediateKeyCache.Get(intermediateKeyMeta.Created);
 
             if (intermediateKey == null)
             {
@@ -461,8 +474,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
                 var newSystemKeyRecord = new KeyRecord(
                     systemKey.GetCreated(),
                     Convert.ToBase64String(await _keyManagementService.EncryptKeyAsync(systemKey)),
-                    false,
-                    null); // No parent key for system keys
+                    false); // No parent key for system keys
 
                 if (await _metastore.StoreAsync(_partition.SystemKeyId, newSystemKeyRecord.Created, newSystemKeyRecord))
                 {
@@ -583,7 +595,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
             {
                 if (rootException != null)
                 {
-                    AggregateException aggregateException = new AggregateException(ex, rootException);
+                    var aggregateException = new AggregateException(ex, rootException);
                     throw new AppEncryptionException(
                         $"Failed to dispose/wipe key, error: {ex.Message}", aggregateException);
                 }
@@ -609,7 +621,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
             DataRowRecord result;
             try
             {
-                result = JsonSerializer.Deserialize<DataRowRecord>(dataRowRecordBytes, JsonOptions);
+                result = JsonSerializer.Deserialize<DataRowRecord>(dataRowRecordBytes, JsonReadOptions);
             }
             catch (JsonException ex)
             {

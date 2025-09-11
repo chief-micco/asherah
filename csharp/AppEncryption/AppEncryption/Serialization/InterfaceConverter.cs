@@ -20,11 +20,9 @@ namespace GoDaddy.Asherah.AppEncryption.Serialization
             return JsonSerializer.Deserialize<TConcrete>(ref reader, options);
         }
 
-        /// <inheritdoc/>
         public override void Write(Utf8JsonWriter writer, TInterface value, JsonSerializerOptions options)
         {
-            // Write implementation can be added if needed for serialization
-            throw new NotImplementedException("Write operation not implemented");
+            throw new NotImplementedException();
         }
     }
 }

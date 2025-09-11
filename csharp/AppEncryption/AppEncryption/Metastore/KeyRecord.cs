@@ -1,6 +1,4 @@
 using System;
-using System.Text.Json.Serialization;
-using GoDaddy.Asherah.AppEncryption.Serialization;
 
 namespace GoDaddy.Asherah.AppEncryption.Metastore
 {
@@ -30,7 +28,6 @@ namespace GoDaddy.Asherah.AppEncryption.Metastore
         /// <summary>
         /// Gets the creation time of the encrypted key.
         /// </summary>
-        [JsonConverter(typeof(UnixTimestampDateTimeOffsetConverter))]
         public DateTimeOffset Created { get; }
 
         /// <summary>
