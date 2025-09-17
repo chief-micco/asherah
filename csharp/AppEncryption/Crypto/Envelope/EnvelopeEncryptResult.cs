@@ -8,4 +8,9 @@ namespace GoDaddy.Asherah.Crypto.Envelope
 
         public T UserState { get; set; }
     }
+
+    // For backwards compatibility
+    public class EnvelopeEncryptResult : EnvelopeEncryptResult<object>
+    {
+    }
 }
