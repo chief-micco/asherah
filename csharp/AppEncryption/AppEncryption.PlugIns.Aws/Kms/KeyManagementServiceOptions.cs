@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
-namespace GoDaddy.Asherah.AppEncryption.Extensions.Aws.Kms
+namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
 {
     /// <summary>
     /// Options for configuring the AWS Key Management Service.

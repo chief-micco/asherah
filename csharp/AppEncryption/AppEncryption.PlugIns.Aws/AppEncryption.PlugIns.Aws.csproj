@@ -1,14 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <PackageId>GoDaddy.Asherah.AppEncryption.Extensions.Aws</PackageId>
-    <Title>AppEncryption.Extensions.Aws</Title>
+    <PackageId>GoDaddy.Asherah.AppEncryption.PlugIns.Aws</PackageId>
+    <Title>AppEncryption.PlugIns.Aws</Title>
     <Authors>GoDaddy</Authors>
     <Company>GoDaddy</Company>
     <Description>AWS extensions for Application level envelope encryption SDK for C#</Description>
     <TargetFrameworks>net8.0;net9.0;netstandard2.0</TargetFrameworks>
     <!-- NOTE: Version controlled via Directory.Build.props  -->
     <!--<Version></Version>-->
-    <RootNamespace>GoDaddy.Asherah.AppEncryption.Extensions.Aws</RootNamespace>
+    <RootNamespace>GoDaddy.Asherah.AppEncryption.PlugIns.Aws</RootNamespace>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <AnalysisMode>Recommended</AnalysisMode>

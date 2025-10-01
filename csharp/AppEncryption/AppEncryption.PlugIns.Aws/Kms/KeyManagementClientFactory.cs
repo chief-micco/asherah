@@ -2,7 +2,7 @@ using System;
 using Amazon.KeyManagementService;
 using Amazon.Runtime;
 
-namespace GoDaddy.Asherah.AppEncryption.Extensions.Aws.Kms
+namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
 {
     /// <summary>
     /// Simple implementation of <see cref="IKeyManagementClientFactory"/> that creates KMS clients

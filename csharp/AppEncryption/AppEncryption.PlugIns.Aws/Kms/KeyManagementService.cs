@@ -14,7 +14,7 @@ using GoDaddy.Asherah.Crypto.Engine.BouncyCastle;
 using GoDaddy.Asherah.Crypto.Keys;
 using Microsoft.Extensions.Logging;
 
-namespace GoDaddy.Asherah.AppEncryption.Extensions.Aws.Kms
+namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
 {
     /// <summary>
     /// AWS-specific implementation of <see cref="IKeyManagementService"/>.

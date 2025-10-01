@@ -6,7 +6,7 @@ using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
 using GoDaddy.Asherah.AppEncryption.Metastore;
 
-namespace GoDaddy.Asherah.AppEncryption.Extensions.Aws.Metastore
+namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Metastore
 {
     /// <summary>
     /// Provides an AWS DynamoDB based implementation of <see cref="IKeyMetastore"/> to store and retrieve system keys

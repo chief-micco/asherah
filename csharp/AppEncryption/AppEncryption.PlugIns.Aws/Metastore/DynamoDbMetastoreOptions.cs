@@ -1,4 +1,4 @@
-namespace GoDaddy.Asherah.AppEncryption.Extensions.Aws.Metastore
+namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Metastore
 {
     /// <summary>
     /// Configuration options for DynamoDbMetastore.

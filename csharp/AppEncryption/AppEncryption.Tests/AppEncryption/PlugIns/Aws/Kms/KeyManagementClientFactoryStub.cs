@@ -4,10 +4,10 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Amazon.KeyManagementService;
 using Amazon.Runtime;
-using GoDaddy.Asherah.AppEncryption.Extensions.Aws.Kms;
+using GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms;
 using GoDaddy.Asherah.AppEncryption.Kms;
 
-namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Extensions.Aws.Kms
+namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.PlugIns.Aws.Kms
 {
     /// <summary>
     /// Stub implementation of IKeyManagementClientFactory for testing purposes.

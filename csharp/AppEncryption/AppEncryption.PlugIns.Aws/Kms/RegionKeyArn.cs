@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace GoDaddy.Asherah.AppEncryption.Extensions.Aws.Kms
+namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
 {
     /// <summary>
     /// Represents a region and its corresponding KMS key ARN.

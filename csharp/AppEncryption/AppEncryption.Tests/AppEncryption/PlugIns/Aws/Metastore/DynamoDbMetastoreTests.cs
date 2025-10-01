@@ -5,13 +5,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
-using GoDaddy.Asherah.AppEncryption.Extensions.Aws.Metastore;
+using GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Metastore;
 using GoDaddy.Asherah.AppEncryption.Metastore;
 using GoDaddy.Asherah.AppEncryption.Tests.Fixtures;
 using Moq;
 using Xunit;
 
-namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Extensions.Aws.Metastore;
+namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.PlugIns.Aws.Metastore;
 
 [ExcludeFromCodeCoverage]
 public class DynamoDbMetastoreTests : IClassFixture<DynamoDbContainerFixture>, IDisposable

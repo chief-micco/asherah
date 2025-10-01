@@ -1,6 +1,6 @@
 using Amazon.KeyManagementService;
 
-namespace GoDaddy.Asherah.AppEncryption.Extensions.Aws.Kms
+namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
 {
     /// <summary>
     /// Factory interface for creating AWS KMS clients for specific regions.

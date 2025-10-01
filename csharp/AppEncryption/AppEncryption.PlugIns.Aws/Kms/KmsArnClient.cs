@@ -1,6 +1,6 @@
 using Amazon.KeyManagementService;
 
-namespace GoDaddy.Asherah.AppEncryption.Extensions.Aws.Kms
+namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
 {
     /// <summary>
     /// Internal class that holds a KMS ARN and its corresponding client.

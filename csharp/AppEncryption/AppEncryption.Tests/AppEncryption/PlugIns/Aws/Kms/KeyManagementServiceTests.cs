@@ -2,13 +2,13 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
-using GoDaddy.Asherah.AppEncryption.Extensions.Aws.Kms;
+using GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms;
 using GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.TestHelpers;
 using GoDaddy.Asherah.Crypto.Engine.BouncyCastle;
 using GoDaddy.Asherah.Crypto.ExtensionMethods;
 using Xunit;
 
-namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Extensions.Aws.Kms
+namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.PlugIns.Aws.Kms
 {
     [ExcludeFromCodeCoverage]
     public class KeyManagementServiceTests : IDisposable
