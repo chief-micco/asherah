@@ -19,7 +19,7 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.PlugIns.Aws.Kms
     [ExcludeFromCodeCoverage]
     public class AwsKeyManagementStub(string keyArn) : IAmazonKeyManagementService
     {
-        public Amazon.Runtime.IClientConfig Config => throw new NotImplementedException();
+        public IClientConfig Config => throw new NotImplementedException();
         public IKeyManagementServicePaginatorFactory Paginators => throw new NotImplementedException();
 
         public Task<CancelKeyDeletionResponse> CancelKeyDeletionAsync(CancelKeyDeletionRequest request, CancellationToken cancellationToken = default)
@@ -224,6 +224,12 @@ namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.PlugIns.Aws.Kms
             if (request.KeyId != keyArn)
             {
                 throw new ArgumentException($"KeyId '{request.KeyId}' does not match expected KeyArn '{keyArn}'");
+            }
+
+            // Simulated error from KMS
+            if (keyArn == "ERROR")
+            {
+                throw new KeyUnavailableException("Simulated KMS error for testing purposes");
             }
 
             // Generate fake data based on the _keyArn to make it unique per ARN

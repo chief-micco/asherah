@@ -1,4 +1,5 @@
 using System;
+using Amazon;
 using Amazon.KeyManagementService;
 using Amazon.Runtime;
 
@@ -6,7 +7,8 @@ namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
 {
     /// <summary>
     /// Simple implementation of <see cref="IKeyManagementClientFactory"/> that creates KMS clients
-    /// for any region using provided AWS credentials.
+    /// for any region using provided AWS credentials. Alternative implementations can be used
+    /// if your application requires more complex credential management or client configuration.
     /// </summary>
     public class KeyManagementClientFactory : IKeyManagementClientFactory
     {
@@ -29,11 +31,11 @@ namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
                 throw new ArgumentException("Region cannot be null or empty", nameof(region));
             }
 
-            var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(region);
-            if (regionEndpoint == null)
-            {
-                throw new ArgumentException($"Invalid AWS region: {region}", nameof(region));
-            }
+            // GetBySystemName will always return a RegionEndpoint. Sometimes with an invalid-name
+            // but it could be working because AWS SDK matches to similar regions. So we don't
+            // do any extra validation on the regionEndpoint here because the application intention
+            // is not known
+            var regionEndpoint = RegionEndpoint.GetBySystemName(region);
 
             var config = new AmazonKeyManagementServiceConfig
             {

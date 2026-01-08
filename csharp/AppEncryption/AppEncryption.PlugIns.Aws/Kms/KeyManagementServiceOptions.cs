@@ -11,7 +11,7 @@ namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
         /// <summary>
         /// Gets or sets the list of region and key ARN pairs for multi-region KMS support.
         /// </summary>
-        [JsonPropertyName("RegionKeyArns")]
+        [JsonPropertyName("regionKeyArns")]
         public List<RegionKeyArn> RegionKeyArns { get; set; } = new List<RegionKeyArn>();
     }
 }

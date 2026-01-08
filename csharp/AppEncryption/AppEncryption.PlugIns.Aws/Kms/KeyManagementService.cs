@@ -21,8 +21,6 @@ namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
     /// </summary>
     public sealed class KeyManagementService : IKeyManagementService, IDisposable
     {
-        private readonly KeyManagementServiceOptions _kmsOptions;
-        private readonly IKeyManagementClientFactory _clientFactory;
         private readonly IReadOnlyList<KmsArnClient> _kmsArnClients;
         private readonly ILogger _logger;
         private readonly BouncyAes256GcmCrypto _crypto = new BouncyAes256GcmCrypto();
@@ -43,6 +41,12 @@ namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
             "Failed to decrypt via region {Region} KMS, trying next region");
 
         /// <summary>
+        /// Creates a new builder for KeyManagementService.
+        /// </summary>
+        /// <returns></returns>
+        public static IKeyManagementServiceBuilder NewBuilder() => new KeyManagementServiceBuilder();
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="KeyManagementService"/> class.
         /// </summary>
         /// <param name="kmsOptions">Key Management Service configuration options.</param>
@@ -50,8 +54,6 @@ namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
         /// <param name="loggerFactory">Factory for creating loggers.</param>
         public KeyManagementService(KeyManagementServiceOptions kmsOptions, IKeyManagementClientFactory clientFactory, ILoggerFactory loggerFactory)
         {
-            _kmsOptions = kmsOptions;
-            _clientFactory = clientFactory;
             _logger = loggerFactory.CreateLogger<KeyManagementService>();
 
             // Build out the KMS ARN clients
@@ -82,7 +84,7 @@ namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
         public async Task<CryptoKey> DecryptKeyAsync(byte[] keyCipherText, DateTimeOffset keyCreated, bool revoked)
         {
             var kmsKeyEnvelope = JsonSerializer.Deserialize<KmsKeyEnvelope>(keyCipherText);
-            byte[] encryptedKey = Convert.FromBase64String(kmsKeyEnvelope.EncryptedKey);
+            var encryptedKey = Convert.FromBase64String(kmsKeyEnvelope.EncryptedKey);
 
             foreach (var kmsArnClient in _kmsArnClients)
             {
@@ -94,7 +96,7 @@ namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
                     continue;
                 }
 
-                byte[] kmsKeyEncryptionKey = Convert.FromBase64String(matchingKmsKek.EncryptedKek);
+                var kmsKeyEncryptionKey = Convert.FromBase64String(matchingKmsKek.EncryptedKek);
 
                 try
                 {
@@ -113,12 +115,12 @@ namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
         public async Task<byte[]> EncryptKeyAsync(CryptoKey key)
         {
             var (dataKey, dataKeyKeyId) = await GenerateDataKeyAsync();
-            byte[] dataKeyPlainText = dataKey.Plaintext.GetBuffer();
+            var dataKeyPlainText = dataKey.Plaintext.GetBuffer();
 
             try
             {
                 var dataKeyCryptoKey = _crypto.GenerateKeyFromBytes(dataKeyPlainText);
-                byte[] encryptedKey = _crypto.EncryptKey(key, dataKeyCryptoKey);
+                var encryptedKey = _crypto.EncryptKey(key, dataKeyCryptoKey);
 
                 var kmsKeyEnvelope = new KmsKeyEnvelope
                 {
@@ -207,9 +209,9 @@ namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
             byte[] plaintextBackingBytes;
 
             // Create a MemoryStream that we will dispose properly
-            using (MemoryStream ciphertextBlobStream = new MemoryStream(kmsKeyEncryptionKey))
+            using (var ciphertextBlobStream = new MemoryStream(kmsKeyEncryptionKey))
             {
-                DecryptRequest request = new DecryptRequest
+                var request = new DecryptRequest
                 {
                     CiphertextBlob = ciphertextBlobStream,
                 };
@@ -218,7 +220,7 @@ namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
             }
 
             // Use proper disposal of the response plaintext stream and securely handle the sensitive bytes
-            using (MemoryStream plaintextStream = response.Plaintext)
+            using (var plaintextStream = response.Plaintext)
             {
                 // Extract the plaintext bytes so we can wipe them in case of an exception
                 plaintextBackingBytes = plaintextStream.GetBuffer();
@@ -258,7 +260,7 @@ namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Kms
                 using (var ciphertextStream = encryptResponse.CiphertextBlob)
                 {
                     // Get the ciphertext bytes
-                    byte[] ciphertextBytes = new byte[ciphertextStream.Length];
+                    var ciphertextBytes = new byte[ciphertextStream.Length];
                     ciphertextStream.Position = 0;
                     ciphertextStream.Read(ciphertextBytes, 0, ciphertextBytes.Length);
 
