@@ -190,13 +190,48 @@ public class DynamoDbMetastoreTests : IClassFixture<DynamoDbContainerFixture>, I
     }
 
     [Fact]
-    public void GetKeySuffixShouldReturnRegionEndpointName()
+    public void GetKeySuffixShouldReturnNullWhenUsingServiceUrl()
     {
-        // Act
+        // When using ServiceURL (like for local DynamoDB), RegionEndpoint is null
         var result = _dynamoDbMetastore.GetKeySuffix();
 
-        // Assert
         Assert.Null(result);
+    }
+
+    [Fact]
+    public void GetKeySuffixShouldReturnEmptyWhenSetToEmpty()
+    {
+        // Arrange
+        var options = new DynamoDbMetastoreOptions
+        {
+            KeyRecordTableName = TestTableName,
+            KeySuffix = string.Empty
+        };
+        var metastore = new DynamoDbMetastore(_amazonDynamoDbClient, options);
+
+        // Act
+        var result = metastore.GetKeySuffix();
+
+        // Assert
+        Assert.Equal(string.Empty, result);
+    }
+
+    [Fact]
+    public void GetKeySuffixShouldReturnCustomValueWhenSet()
+    {
+        // Arrange
+        var options = new DynamoDbMetastoreOptions
+        {
+            KeyRecordTableName = TestTableName,
+            KeySuffix = "my-custom-suffix"
+        };
+        var metastore = new DynamoDbMetastore(_amazonDynamoDbClient, options);
+
+        // Act
+        var result = metastore.GetKeySuffix();
+
+        // Assert
+        Assert.Equal("my-custom-suffix", result);
     }
 
     [Theory]

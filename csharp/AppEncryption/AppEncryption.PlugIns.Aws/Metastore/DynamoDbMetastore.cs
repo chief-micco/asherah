@@ -23,10 +23,17 @@ namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Metastore
         /// </summary>
         /// <param name="dynamoDbClient">The AWS DynamoDB client to use for operations.</param>
         /// <param name="options">Configuration options for the metastore.</param>
+        /// <exception cref="ArgumentNullException">Thrown when dynamoDbClient or options is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when KeyRecordTableName is null or empty.</exception>
         public DynamoDbMetastore(IAmazonDynamoDB dynamoDbClient, DynamoDbMetastoreOptions options)
         {
-            _dynamoDbClient = dynamoDbClient;
-            _options = options;
+            _dynamoDbClient = dynamoDbClient ?? throw new ArgumentNullException(nameof(dynamoDbClient));
+            _options = options ?? throw new ArgumentNullException(nameof(options));
+
+            if (string.IsNullOrEmpty(_options.KeyRecordTableName))
+            {
+                throw new ArgumentException("KeyRecordTableName must not be null or empty", nameof(options));
+            }
         }
 
         private const string PartitionKey = "Id";
@@ -151,8 +158,19 @@ namespace GoDaddy.Asherah.AppEncryption.PlugIns.Aws.Metastore
         /// <inheritdoc />
         public string GetKeySuffix()
         {
+            if (_options.KeySuffix != null)
+            {
+                return _options.KeySuffix;
+            }
+
             return _dynamoDbClient.Config.RegionEndpoint?.SystemName;
         }
+
+        /// <summary>
+        /// Creates a new <see cref="IDynamoDbMetastoreBuilder"/> instance for constructing a <see cref="DynamoDbMetastore"/>.
+        /// </summary>
+        /// <returns>A new <see cref="IDynamoDbMetastoreBuilder"/> instance.</returns>
+        public static IDynamoDbMetastoreBuilder NewBuilder() => new DynamoDbMetastoreBuilder();
 
         private static KeyRecord ConvertAttributeValueToKeyRecord(AttributeValue keyRecordAttribute)
         {
