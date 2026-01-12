@@ -32,5 +32,6 @@
   <ItemGroup Label="Project References">
     <ProjectReference Include="../AppEncryption/AppEncryption.csproj" />
     <ProjectReference Include="../AppEncryption.PlugIns.Aws/AppEncryption.PlugIns.Aws.csproj" />
+    <ProjectReference Include="../AppEncryption.PlugIns.Testing/AppEncryption.PlugIns.Testing.csproj" />
   </ItemGroup>
 </Project>

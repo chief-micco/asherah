@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using GoDaddy.Asherah.AppEncryption.Metastore;
+using GoDaddy.Asherah.AppEncryption.PlugIns.Testing.Metastore;
 using Xunit;
 
 namespace GoDaddy.Asherah.AppEncryption.Tests.AppEncryption.Metastore
