@@ -2,14 +2,15 @@ using System;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using GoDaddy.Asherah.AppEncryption.Core;
 using GoDaddy.Asherah.AppEncryption.Exceptions;
 using GoDaddy.Asherah.AppEncryption.Metastore;
 using GoDaddy.Asherah.AppEncryption.Serialization;
 using GoDaddy.Asherah.AppEncryption.Kms;
-using GoDaddy.Asherah.Crypto.Envelope;
-using GoDaddy.Asherah.Crypto.Keys;
 using GoDaddy.Asherah.Crypto;
+using GoDaddy.Asherah.Crypto.Envelope;
 using GoDaddy.Asherah.Crypto.Exceptions;
+using GoDaddy.Asherah.Crypto.Keys;
 using Microsoft.Extensions.Logging;
 
 using MetastoreKeyMeta = GoDaddy.Asherah.AppEncryption.Metastore.KeyMeta;
@@ -43,14 +44,17 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
             }
         };
 
-        private readonly Partition _partition;
-        private readonly AeadEnvelopeCrypto _crypto;
+        private readonly ISessionPartition _partition;
         private readonly IKeyMetastore _metastore;
+        private readonly IKeyManagementService _keyManagementService;
+        private readonly IEnvelopeCryptoContext _cryptoContext;
+        private readonly ILogger _logger;
+
+        // Cached properties from IEnvelopeCryptoContext to avoid interface dispatch overhead
+        private readonly AeadEnvelopeCrypto _crypto;
+        private readonly CryptoPolicy _policy;
         private readonly SecureCryptoKeyDictionary<DateTimeOffset> _systemKeyCache;
         private readonly SecureCryptoKeyDictionary<DateTimeOffset> _intermediateKeyCache;
-        private readonly CryptoPolicy _cryptoPolicy;
-        private readonly IKeyManagementService _keyManagementService;
-        private readonly ILogger _logger;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="EnvelopeEncryption"/> class.
@@ -58,29 +62,26 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         /// <param name="partition">The partition for this envelope encryption instance.</param>
         /// <param name="metastore">The metastore for storing and retrieving keys.</param>
         /// <param name="keyManagementService">Service for key management operations.</param>
-        /// <param name="crypto">The crypto implementation for envelope operations.</param>
-        /// <param name="cryptoPolicy">Policy that dictates crypto behaviors.</param>
-        /// <param name="systemKeyCache">Cache for system keys.</param>
-        /// <param name="intermediateKeyCache">Cache for intermediate keys.</param>
+        /// <param name="cryptoContext">The crypto context containing crypto, policy, and key caches.</param>
         /// <param name="logger">The logger implementation to use.</param>
         public EnvelopeEncryption(
-            Partition partition,
+            ISessionPartition partition,
             IKeyMetastore metastore,
             IKeyManagementService keyManagementService,
-            AeadEnvelopeCrypto crypto,
-            CryptoPolicy cryptoPolicy,
-            SecureCryptoKeyDictionary<DateTimeOffset> systemKeyCache,
-            SecureCryptoKeyDictionary<DateTimeOffset> intermediateKeyCache,
+            IEnvelopeCryptoContext cryptoContext,
             ILogger logger)
         {
             _partition = partition;
             _metastore = metastore;
             _keyManagementService = keyManagementService;
-            _crypto = crypto;
-            _cryptoPolicy = cryptoPolicy;
-            _systemKeyCache = systemKeyCache;
-            _intermediateKeyCache = intermediateKeyCache;
+            _cryptoContext = cryptoContext;
             _logger = logger;
+
+            // Cache properties to avoid repeated interface dispatch
+            _crypto = cryptoContext.Crypto;
+            _policy = cryptoContext.Policy;
+            _systemKeyCache = cryptoContext.SystemKeyCache;
+            _intermediateKeyCache = cryptoContext.IntermediateKeyCache;
         }
 
         /// <inheritdoc/>
@@ -107,7 +108,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
 
             if (!_partition.IsValidIntermediateKeyId(dataRowRecordModel.Key.ParentKeyMeta.KeyId))
             {
-                throw new MetadataMissingException("Could not find parentKeyMeta {IK} for dataRowKey");
+                throw new MetadataMissingException($"Intermediate key '{dataRowRecordModel.Key.ParentKeyMeta.KeyId}' does not match partition '{_partition.IntermediateKeyId}'");
             }
 
             // the Data property is a base64 encoded string containing the encrypted payload
@@ -166,7 +167,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
                 intermediateKey = await GetLatestOrCreateIntermediateKey();
 
                 // Put the key into our cache if allowed
-                if (_cryptoPolicy.CanCacheIntermediateKeys())
+                if (_policy.CanCacheIntermediateKeys())
                 {
                     try
                     {
@@ -197,7 +198,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
                 systemKey = await GetLatestOrCreateSystemKey();
 
                 // Put the key into our cache if allowed
-                if (_cryptoPolicy.CanCacheSystemKeys())
+                if (_policy.CanCacheSystemKeys())
                 {
                     try
                     {
@@ -256,7 +257,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
             }
 
             // Phase 2: Create new intermediate key
-            var intermediateKeyCreated = _cryptoPolicy.TruncateToIntermediateKeyPrecision(DateTime.UtcNow);
+            var intermediateKeyCreated = _policy.TruncateToIntermediateKeyPrecision(DateTime.UtcNow);
             var intermediateKey = _crypto.GenerateKey(intermediateKeyCreated);
 
             try
@@ -322,7 +323,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
                 intermediateKey = await GetIntermediateKey(intermediateKeyMeta);
 
                 // Put the key into our cache if allowed
-                if (_cryptoPolicy.CanCacheIntermediateKeys())
+                if (_policy.CanCacheIntermediateKeys())
                 {
                     try
                     {
@@ -393,7 +394,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
                 systemKey = await GetSystemKey(systemKeyMeta);
 
                 // Put the key into our cache if allowed
-                if (_cryptoPolicy.CanCacheSystemKeys())
+                if (_policy.CanCacheSystemKeys())
                 {
                     try
                     {
@@ -467,7 +468,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
             }
 
             // Phase 2: Create new key
-            var systemKeyCreated = _cryptoPolicy.TruncateToSystemKeyPrecision(DateTimeOffset.UtcNow);
+            var systemKeyCreated = _policy.TruncateToSystemKeyPrecision(DateTimeOffset.UtcNow);
             var systemKey = _crypto.GenerateKey(systemKeyCreated);
             try
             {
@@ -531,7 +532,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         /// <returns>True if the key record is expired or revoked, false otherwise.</returns>
         private bool IsKeyExpiredOrRevoked(IKeyRecord keyRecord)
         {
-            return _cryptoPolicy.IsKeyExpired(keyRecord.Created) || (keyRecord.Revoked ?? false);
+            return _policy.IsKeyExpired(keyRecord.Created) || (keyRecord.Revoked ?? false);
         }
 
         /// <summary>
@@ -541,7 +542,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         /// <returns>True if the key is expired or revoked, false otherwise.</returns>
         private bool IsKeyExpiredOrRevoked(CryptoKey cryptoKey)
         {
-            return _cryptoPolicy.IsKeyExpired(cryptoKey.GetCreated()) || cryptoKey.IsRevoked();
+            return _policy.IsKeyExpired(cryptoKey.GetCreated()) || cryptoKey.IsRevoked();
         }
 
         /// <summary>
@@ -571,8 +572,7 @@ namespace GoDaddy.Asherah.AppEncryption.Envelope
         {
             try
             {
-                // only close intermediate key cache since its lifecycle is tied to this "session"
-                _intermediateKeyCache.Dispose();
+                _cryptoContext.Dispose();
             }
             catch (Exception ex)
             {

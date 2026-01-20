@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
+using GoDaddy.Asherah.AppEncryption.Core;
 using GoDaddy.Asherah.AppEncryption.Envelope;
 using GoDaddy.Asherah.AppEncryption.Exceptions;
 using GoDaddy.Asherah.AppEncryption.Kms;
@@ -46,16 +47,13 @@ public class EnvelopeEncryptionTests
             .Build();
 
         var systemKeyCache = new SecureCryptoKeyDictionary<DateTimeOffset>(cryptoPolicy.GetRevokeCheckPeriodMillis());
-        var intermediateKeyCache = new SecureCryptoKeyDictionary<DateTimeOffset>(cryptoPolicy.GetRevokeCheckPeriodMillis());
+        var cryptoContext = new SessionCryptoContext(crypto, cryptoPolicy, systemKeyCache);
 
         return new EnvelopeEncryption(
             partition,
             metastore,
             keyManagementService,
-            crypto,
-            cryptoPolicy,
-            systemKeyCache,
-            intermediateKeyCache,
+            cryptoContext,
             logger);
     }
 
